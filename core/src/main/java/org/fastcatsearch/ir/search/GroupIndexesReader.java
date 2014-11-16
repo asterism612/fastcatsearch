@@ -12,7 +12,7 @@ public class GroupIndexesReader extends SelectableIndexesReader<GroupIndexReader
 	
 	public GroupIndexesReader(){ }
 	
-	public GroupIndexesReader(Schema schema, File dir, int revision) throws IOException, IRException{
+	public GroupIndexesReader(Schema schema, File dir) throws IOException, IRException{
 		indexSettingList = schema.schemaSetting().getGroupIndexSettingList();
 		int indexCount = indexSettingList == null ? 0 : indexSettingList.size();
 		
@@ -22,7 +22,7 @@ public class GroupIndexesReader extends SelectableIndexesReader<GroupIndexReader
 			GroupIndexSetting setting = indexSettingList.get(i);
 			GroupIndexReader reader = null;
 			try{
-				reader = new GroupIndexReader(setting, schema.fieldSettingMap(), dir, revision);
+				reader = new GroupIndexReader(setting, schema.fieldSettingMap(), dir);
 			}catch(Exception e){
 				logger.error("그룹색인 {}로딩중 에러 >> {}", setting.getId(), e);
 			}

@@ -52,14 +52,9 @@ public class FieldIndexWriter implements WriteInfoLoggable {
 
 	public FieldIndexWriter(FieldIndexSetting fieldIndexSetting, Map<String, FieldSetting> fieldSettingMap, Map<String, Integer> fieldSequenceMap,
 			File dir) throws IOException, IRException {
-		this(fieldIndexSetting, fieldSettingMap, fieldSequenceMap, dir, false);
-	}
-
-	public FieldIndexWriter(FieldIndexSetting fieldIndexSetting, Map<String, FieldSetting> fieldSettingMap, Map<String, Integer> fieldSequenceMap,
-			File dir, boolean isAppend) throws IOException, IRException {
 		String id = fieldIndexSetting.getId();
 		this.indexId = id;
-		fieldIndexOutput = new BufferedFileOutput(dir, IndexFileNames.getFieldIndexFileName(id), isAppend);
+		fieldIndexOutput = new BufferedFileOutput(dir, IndexFileNames.getFieldIndexFileName(id));
 
 		String refFieldId = fieldIndexSetting.getRef();
 		fieldSequence = fieldSequenceMap.get(refFieldId);
@@ -70,7 +65,7 @@ public class FieldIndexWriter implements WriteInfoLoggable {
 
 		isMultiValue = refFieldSetting.isMultiValue();
 		if (isMultiValue) {
-			multiValueOutput = new BufferedFileOutput(dir, IndexFileNames.getMultiValueFileName(IndexFileNames.getFieldIndexFileName(id)), isAppend);
+			multiValueOutput = new BufferedFileOutput(dir, IndexFileNames.getMultiValueFileName(IndexFileNames.getFieldIndexFileName(id)));
 		}
 
 	}

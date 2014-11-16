@@ -23,8 +23,8 @@ import java.util.List;
 
 import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IRException;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.document.Document;
 import org.fastcatsearch.ir.settings.IndexSetting;
 import org.fastcatsearch.ir.settings.Schema;
@@ -45,11 +45,11 @@ public class SearchIndexesWriter {
 
 	private int count;
 
-	public SearchIndexesWriter(Schema schema, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager) throws IOException, IRException {
-		this(schema, dir, revisionInfo, indexConfig, analyzerPoolManager, null);
+	public SearchIndexesWriter(Schema schema, File dir, SegmentInfo segmentInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager) throws IOException, IRException {
+		this(schema, dir, segmentInfo, indexConfig, analyzerPoolManager, null);
 	}
 
-	public SearchIndexesWriter(Schema schema, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager,
+	public SearchIndexesWriter(Schema schema, File dir, SegmentInfo segmentInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager,
 			List<String> indexIdList) throws IOException, IRException {
 		this.indexSettingList = schema.schemaSetting().getIndexSettingList();
 		
@@ -60,7 +60,7 @@ public class SearchIndexesWriter {
 		for (int i = 0; i < totalSize; i++) {
 			IndexSetting indexSetting = indexSettingList.get(i);
 			if(indexIdList == null || indexIdList.contains(indexSetting.getId())){
-				SearchIndexWriter searchIndexWriter = new SearchIndexWriter(indexSetting, schema, dir, revisionInfo, indexConfig, analyzerPoolManager);
+				SearchIndexWriter searchIndexWriter = new SearchIndexWriter(indexSetting, schema, dir, segmentInfo, indexConfig, analyzerPoolManager);
 				list.add(searchIndexWriter);
 			}
 		}

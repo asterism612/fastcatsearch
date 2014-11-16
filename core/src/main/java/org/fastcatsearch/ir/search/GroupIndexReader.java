@@ -48,25 +48,25 @@ public class GroupIndexReader extends ReferencableIndexReader {
 	
 	public GroupIndexReader() {}
 	
-	public GroupIndexReader(GroupIndexSetting groupIndexSetting, Map<String, FieldSetting> fieldSettingMap, File dir, int revision) throws IOException, IRException{
+	public GroupIndexReader(GroupIndexSetting groupIndexSetting, Map<String, FieldSetting> fieldSettingMap, File segmentDir) throws IOException, IRException{
 		String id = groupIndexSetting.getId();
 		String refId = groupIndexSetting.getRef();
 		FieldSetting refFieldSetting = fieldSettingMap.get(refId);
 		
-		File dataFile = new File(dir, IndexFileNames.getGroupIndexFileName(id));
-		File multiValueFile = new File(dir, IndexFileNames.getMultiValueFileName(IndexFileNames.getGroupIndexFileName(id)));
+		File dataFile = new File(segmentDir, IndexFileNames.getGroupIndexFileName(id));
+		File multiValueFile = new File(segmentDir, IndexFileNames.getMultiValueFileName(IndexFileNames.getGroupIndexFileName(id)));
     	
 		init(id, refFieldSetting, dataFile, multiValueFile, IOUtil.SIZE_OF_INT);
 		
 		if(refFieldSetting.isVariableField()){
-			groupKeyInput = new VariableDataInput(dir, IndexFileNames.getGroupKeyFileName(id));
+			groupKeyInput = new VariableDataInput(segmentDir, IndexFileNames.getGroupKeyFileName(id));
 		}else{
 			int dataSize = refFieldSetting.getByteSize();
-			groupKeyInput = new FixedDataInput(dir, IndexFileNames.getGroupKeyFileName(id), dataSize);
+			groupKeyInput = new FixedDataInput(segmentDir, IndexFileNames.getGroupKeyFileName(id), dataSize);
 		}
 		
-		File revisionDir = new File(dir, Integer.toString(revision));
-		PrimaryKeyIndexReader pkReader = new PrimaryKeyIndexReader(revisionDir, IndexFileNames.getGroupKeyMapFileName(id));
+//		File revisionDir = new File(dir, Integer.toString(revision));
+		PrimaryKeyIndexReader pkReader = new PrimaryKeyIndexReader(segmentDir, IndexFileNames.getGroupKeyMapFileName(id));
 		groupKeySize = pkReader.count();
 		pkReader.close();
 //		logger.debug("Group {} >> keysize:{}", id, groupKeySize);

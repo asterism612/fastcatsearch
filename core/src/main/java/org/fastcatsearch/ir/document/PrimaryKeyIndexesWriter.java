@@ -19,12 +19,10 @@ package org.fastcatsearch.ir.document;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.Random;
 
-import org.apache.commons.io.FileUtils;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.IndexFileNames;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.field.Field;
 import org.fastcatsearch.ir.io.BitSet;
@@ -57,10 +55,10 @@ public class PrimaryKeyIndexesWriter {
 	int MEMORY_LIMIT = 64 * 1024 * 1024; //적절은 64M
 	int CHECK_COUNT = 100000;
 	int count;
-	public PrimaryKeyIndexesWriter(Schema schema, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig) throws IOException, IRException {
-		String segmentId = dir.getName();
-		boolean isAppend = revisionInfo.isAppend();
-		File revisionDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getId());
+	public PrimaryKeyIndexesWriter(Schema schema, File segmentDir, SegmentInfo segmentInfo, IndexConfig indexConfig) throws IOException, IRException {
+		String segmentId = segmentDir.getName();
+//		boolean isAppend = revisionInfo.isAppend();
+//		File segmentDir = IndexFileNames.getRevisionDir(dir, segmentInfo.getId());
 		
 		primaryKeySetting = schema.schemaSetting().getPrimaryKeySetting();
 		
@@ -87,28 +85,28 @@ public class PrimaryKeyIndexesWriter {
 		//
 		// 증분수집일 경우, pk를 나중에 쉽게 읽을 수 있도록 임시벌크파일 형태로 기록한다.
 		//
-		if (isAppend) {
-			indexWriter = new LargePrimaryKeyIndexWriter(revisionDir, IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap), indexConfig.getPkTermInterval(), indexConfig.getPkBucketSize());
-		} else {
+//		if (isAppend) {
+//			indexWriter = new LargePrimaryKeyIndexWriter(segmentDir, IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap), indexConfig.getPkTermInterval(), indexConfig.getPkBucketSize());
+//		} else {
 			// 전체색인의 경우는 이후에 다시 작업할 일이 없으므로, 완전한 pk map파일로 기록한다.
-			indexWriter = new LargePrimaryKeyIndexWriter(revisionDir, IndexFileNames.primaryKeyMap, indexConfig.getPkTermInterval(), indexConfig.getPkBucketSize());
-		}
+			indexWriter = new LargePrimaryKeyIndexWriter(segmentDir, IndexFileNames.primaryKeyMap, indexConfig.getPkTermInterval(), indexConfig.getPkBucketSize());
+//		}
 
 		pkbaos = new BytesDataOutput(1024); //초기 1kb로 시작.
 		
 		String docDeleteSetName = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId);
-		if (isAppend) {
-			File prevRevisionDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getRef());
-			// copy prev revision's delete.set
-			// 증분색인의 append일 경우에는 이전 revision의 deleteSet을 가져와서 사용한다.
-			// DocumentWriter.close()시 이전 rev와 새 rev의 중복되는 문서를 delete처리해준다.
-			File prevDelete = new File(prevRevisionDir, docDeleteSetName);
-			//이전 리비전의 delete.set을 현재 리비전 dir로 가져와서 이어쓰도록 한다.
-			FileUtils.copyFileToDirectory(prevDelete, revisionDir);
-			deleteSet = new BitSet(revisionDir, docDeleteSetName);
-		} else {
-			deleteSet = new BitSet(revisionDir, docDeleteSetName, true);
-		}
+//		if (isAppend) {
+//			File prevRevisionDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getRef());
+//			// copy prev revision's delete.set
+//			// 증분색인의 append일 경우에는 이전 revision의 deleteSet을 가져와서 사용한다.
+//			// DocumentWriter.close()시 이전 rev와 새 rev의 중복되는 문서를 delete처리해준다.
+//			File prevDelete = new File(prevRevisionDir, docDeleteSetName);
+//			//이전 리비전의 delete.set을 현재 리비전 dir로 가져와서 이어쓰도록 한다.
+//			FileUtils.copyFileToDirectory(prevDelete, revisionDir);
+//			deleteSet = new BitSet(segmentDir, docDeleteSetName);
+//		} else {
+			deleteSet = new BitSet(segmentDir, docDeleteSetName, true);
+//		}
 	}
 
 	public int getUpdateDocCount() {

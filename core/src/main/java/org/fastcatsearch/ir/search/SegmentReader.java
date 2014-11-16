@@ -89,27 +89,28 @@ public class SegmentReader {
 		this.schema = schema;
 		this.segmentDir = segmentDir;
 		this.segmentInfo = segmentInfo;
-		int revision = segmentInfo.getRevisionInfo().getId();
-		int ref = segmentInfo.getRevisionInfo().getRef();
+//		int revision = segmentInfo.getRevisionInfo().getId();
+//		int ref = segmentInfo.getRevisionInfo().getRef();
 		
 		this.documentReader = new DocumentReader(schema.schemaSetting(), segmentDir, segmentInfo.getBaseNumber());
 		int documentCount = documentReader.getDocumentCount();
 		
 		// reader들은 thread-safe하지 않다. clone해서 사용됨.
-		this.searchIndexesReader = new SearchIndexesReader(schema, segmentDir, ref, analyzerPoolManager, documentCount);
+		this.searchIndexesReader = new SearchIndexesReader(schema, segmentDir, analyzerPoolManager, documentCount);
 		
 		//field index
 		this.fieldIndexesReader = new FieldIndexesReader(schema, segmentDir);
 		
 //		// group index
-		this.groupIndexesReader = new GroupIndexesReader(schema, segmentDir, ref);
+		this.groupIndexesReader = new GroupIndexesReader(schema, segmentDir);
 
 		
 		
 		if (bitset != null) {
 			deleteSet = bitset;
 		} else {
-			deleteSet = new BitSet(IndexFileNames.getRevisionDir(segmentDir, revision), IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
+//			deleteSet = new BitSet(IndexFileNames.getRevisionDir(segmentDir, revision), IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
+			deleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
 		}
 	}
 
@@ -129,9 +130,9 @@ public class SegmentReader {
 		return segmentDir;
 	}
 	
-	public File revisionDir(){
-		return new File(segmentDir, Integer.toString(segmentInfo.getRevision()));
-	}
+//	public File revisionDir(){
+//		return new File(segmentDir, Integer.toString(segmentInfo.getRevision()));
+//	}
 	
 	public SegmentInfo segmentInfo(){
 		return segmentInfo;

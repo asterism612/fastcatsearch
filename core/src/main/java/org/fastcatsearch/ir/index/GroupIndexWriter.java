@@ -23,12 +23,10 @@ import java.util.Map;
 import org.apache.lucene.util.BytesRef;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.IndexFileNames;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.document.Document;
-import org.fastcatsearch.ir.document.PrimaryKeyIndexReader;
 import org.fastcatsearch.ir.document.PrimaryKeyIndexWriter;
-import org.fastcatsearch.ir.document.merge.PrimaryKeyIndexMerger;
 import org.fastcatsearch.ir.field.Field;
 import org.fastcatsearch.ir.field.FieldDataWriter;
 import org.fastcatsearch.ir.io.BufferedFileOutput;
@@ -42,7 +40,6 @@ import org.fastcatsearch.ir.settings.FieldSetting;
 import org.fastcatsearch.ir.settings.GroupIndexSetting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 /**
  * 그룹필드는 가변길이필드허용. multi-value도 가변길이 가능.
  * 
@@ -61,9 +58,9 @@ public class GroupIndexWriter implements WriteInfoLoggable {
 	private int groupNumber;
 	private SequencialDataOutput keyOutput;
 
-	private boolean isAppend;
-	private File baseDir;
-	private PrimaryKeyIndexReader prevPkReader; // 이전 pk reader 리스트. 증분색인시에 사용됨.
+//	private boolean isAppend;
+	private File segmentDir;
+//	private PrimaryKeyIndexReader prevPkReader; // 이전 pk reader 리스트. 증분색인시에 사용됨.
 	private int indexInterval;
 	private int count;
 	private boolean isMultiValue;
@@ -72,18 +69,18 @@ public class GroupIndexWriter implements WriteInfoLoggable {
 	private BytesDataOutput keyBuffer;
 
 	private int fieldSequence;
-	private RevisionInfo revisionInfo;
+	private SegmentInfo segmentInfo;
 	
 	public GroupIndexWriter(GroupIndexSetting groupIndexSetting, Map<String, FieldSetting> fieldSettingMap, Map<String, Integer> fieldSequenceMap,
-			File dir, RevisionInfo revisionInfo, IndexConfig indexConfig) throws IOException, IRException {
-		this.revisionInfo = revisionInfo;
-		this.isAppend = revisionInfo.isAppend();
-		this.baseDir = dir;
+			File dir, SegmentInfo segmentInfo, IndexConfig indexConfig) throws IOException, IRException {
+		this.segmentInfo = segmentInfo;
+//		this.isAppend = revisionInfo.isAppend();
+		this.segmentDir = dir;
 
 		String id = groupIndexSetting.getId();
 		this.indexId = id;
 
-		groupIndexOutput = new BufferedFileOutput(dir, IndexFileNames.getGroupIndexFileName(id), isAppend);
+		groupIndexOutput = new BufferedFileOutput(dir, IndexFileNames.getGroupIndexFileName(id));
 
 		indexInterval = indexConfig.getPkTermInterval();
 		int bucketSize = indexConfig.getPkBucketSize();
@@ -95,24 +92,24 @@ public class GroupIndexWriter implements WriteInfoLoggable {
 		isIgnoreCase = groupIndexSetting.isIgnoreCase();
 		
 		if (refFieldSetting.isVariableField()) {
-			keyOutput = new VariableDataOutput(dir, IndexFileNames.getGroupKeyFileName(id), isAppend);
+			keyOutput = new VariableDataOutput(dir, IndexFileNames.getGroupKeyFileName(id));
 		} else {
-			keyOutput = new FixedDataOutput(dir, IndexFileNames.getGroupKeyFileName(id), isAppend);
+			keyOutput = new FixedDataOutput(dir, IndexFileNames.getGroupKeyFileName(id));
 		}
 		memoryKeyIndex = new PrimaryKeyIndexWriter(indexInterval, bucketSize);
 
 		if (isMultiValue) {
-			multiValueOutput = new BufferedFileOutput(dir, IndexFileNames.getMultiValueFileName(IndexFileNames.getGroupIndexFileName(id)), isAppend);
+			multiValueOutput = new BufferedFileOutput(dir, IndexFileNames.getMultiValueFileName(IndexFileNames.getGroupIndexFileName(id)));
 		}
 
 		keyBuffer = new BytesDataOutput();
 		
-		if (isAppend) {
-			// read previous pkmap
-			File prevDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getRef());
-			prevPkReader = new PrimaryKeyIndexReader(prevDir, IndexFileNames.getGroupKeyMapFileName(id));
-			groupNumber = prevPkReader.count();
-		}
+//		if (isAppend) {
+//			// read previous pkmap
+//			File prevDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getRef());
+//			prevPkReader = new PrimaryKeyIndexReader(prevDir, IndexFileNames.getGroupKeyMapFileName(id));
+//			groupNumber = prevPkReader.count();
+//		}
 
 	}
 
@@ -166,15 +163,15 @@ public class GroupIndexWriter implements WriteInfoLoggable {
 	 */
 	private int writeGroupKey(BytesBuffer keyBuffer) throws IOException {
 		int groupNo = -1;
-		if (isAppend) {
-			// find key at previous append's pkmap
-			groupNo = prevPkReader.get(keyBuffer);
-			if (groupNo == -1) {
-				groupNo = memoryKeyIndex.get(keyBuffer);
-			}
-		} else {
+//		if (isAppend) {
+//			// find key at previous append's pkmap
+//			groupNo = prevPkReader.get(keyBuffer);
+//			if (groupNo == -1) {
+//				groupNo = memoryKeyIndex.get(keyBuffer);
+//			}
+//		} else {
 			groupNo = memoryKeyIndex.get(keyBuffer);
-		}
+//		}
 		if (groupNo == -1) {
 			groupNo = groupNumber++;
 			// write key index
@@ -201,60 +198,60 @@ public class GroupIndexWriter implements WriteInfoLoggable {
 		}
 
 		if (count <= 0) {
-			if (isAppend) {
-				prevPkReader.close();
-			}
+//			if (isAppend) {
+//				prevPkReader.close();
+//			}
 			return;
 		}
 
 		String pkFilename = IndexFileNames.getGroupKeyMapFileName(indexId);
 		String pkIndexFilename = IndexFileNames.getIndexFileName(pkFilename);
 
-		File revisionDir = IndexFileNames.getRevisionDir(baseDir, revisionInfo.getId());
-		File tempPkFile = new File(revisionDir, IndexFileNames.getTempFileName(pkFilename));
-		File tempPkIndexFile = new File(revisionDir, IndexFileNames.getTempFileName(pkIndexFilename));
+//		File revisionDir = IndexFileNames.getRevisionDir(baseDir, .getId());
+		File tempPkFile = new File(segmentDir, IndexFileNames.getTempFileName(pkFilename));
+		File tempPkIndexFile = new File(segmentDir, IndexFileNames.getTempFileName(pkIndexFilename));
 
-		File pkFile = new File(revisionDir, pkFilename);
-		File pkIndexFile = new File(revisionDir, pkIndexFilename);
+		File pkFile = new File(segmentDir, pkFilename);
+		File pkIndexFile = new File(segmentDir, pkIndexFilename);
 
 		IndexOutput groupPkOutput = null;
 		IndexOutput groupPkIndexOutput = null;
 		
-		if (isAppend) {
-			// 머징을 위해 일단 TEMP파일로 생성한다.
-			groupPkOutput = new BufferedFileOutput(tempPkFile);
-			groupPkIndexOutput = new BufferedFileOutput(tempPkIndexFile);
-		} else {
+//		if (isAppend) {
+//			// 머징을 위해 일단 TEMP파일로 생성한다.
+//			groupPkOutput = new BufferedFileOutput(tempPkFile);
+//			groupPkIndexOutput = new BufferedFileOutput(tempPkIndexFile);
+//		} else {
 			groupPkOutput = new BufferedFileOutput(pkFile);
 			groupPkIndexOutput = new BufferedFileOutput(pkIndexFile);
-		}
+//		}
 
 		memoryKeyIndex.setDestination(groupPkOutput, groupPkIndexOutput);
 		memoryKeyIndex.write();
 		groupPkOutput.close();
 		groupPkIndexOutput.close();
 
-		if (isAppend) {
-			// 임시 map index파일 삭제.
-			tempPkIndexFile.delete();
-			prevPkReader.close();
-
-			// pkindex merge
-			File prevDir = IndexFileNames.getRevisionDir(baseDir, revisionInfo.getRef());
-			File prevPkFile = new File(prevDir, pkFilename);
-
-			IndexOutput output = new BufferedFileOutput(pkFile);
-			IndexOutput indexOutput = new BufferedFileOutput(pkIndexFile);
-
-			// 3-way 머지.
-			PrimaryKeyIndexMerger primaryKeyIndexMerger = new PrimaryKeyIndexMerger();
-			primaryKeyIndexMerger.merge(prevPkFile, tempPkFile, output, indexOutput, indexInterval);
-			output.close();
-			indexOutput.close();
-
-			tempPkFile.delete();
-
-		}
+//		if (isAppend) {
+//			// 임시 map index파일 삭제.
+//			tempPkIndexFile.delete();
+//			prevPkReader.close();
+//
+//			// pkindex merge
+//			File prevDir = IndexFileNames.getRevisionDir(baseDir, revisionInfo.getRef());
+//			File prevPkFile = new File(prevDir, pkFilename);
+//
+//			IndexOutput output = new BufferedFileOutput(pkFile);
+//			IndexOutput indexOutput = new BufferedFileOutput(pkIndexFile);
+//
+//			// 3-way 머지.
+//			PrimaryKeyIndexMerger primaryKeyIndexMerger = new PrimaryKeyIndexMerger();
+//			primaryKeyIndexMerger.merge(prevPkFile, tempPkFile, output, indexOutput, indexInterval);
+//			output.close();
+//			indexOutput.close();
+//
+//			tempPkFile.delete();
+//
+//		}
 
 	}
 

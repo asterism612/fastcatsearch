@@ -4,7 +4,6 @@ import java.util.Date;
 
 import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.settings.Schema;
 import org.fastcatsearch.ir.settings.SchemaSetting;
@@ -127,7 +126,7 @@ public class CollectionContext {
 		return null;
 	}
 	
-	public void updateCollectionStatus(IndexingType indexingType, RevisionInfo revisionInfo, long startTime, long endTime){
+	public void updateCollectionStatus(IndexingType indexingType, SegmentInfo segmentInfo, long startTime, long endTime){
 		IndexStatus indexStatus = null;
 		if(indexingType == IndexingType.FULL){
 			indexStatus = collectionIndexStatus.getFullIndexStatus();
@@ -144,10 +143,10 @@ public class CollectionContext {
 				collectionIndexStatus.setAddIndexStatus(indexStatus);
 			}
 		}
-		indexStatus.setDocumentCount(revisionInfo.getDocumentCount());
-		indexStatus.setInsertCount(revisionInfo.getInsertCount());
-		indexStatus.setUpdateCount(revisionInfo.getUpdateCount());
-		indexStatus.setDeleteCount(revisionInfo.getDeleteCount());
+		indexStatus.setDocumentCount(segmentInfo.getDocumentCount());
+		indexStatus.setInsertCount(segmentInfo.getInsertCount());
+		indexStatus.setUpdateCount(segmentInfo.getUpdateCount());
+		indexStatus.setDeleteCount(segmentInfo.getDeleteCount());
 		indexStatus.setStartTime(Formatter.formatDate(new Date(startTime)));
 		indexStatus.setEndTime(Formatter.formatDate(new Date(endTime)));
 		indexStatus.setDuration(Formatter.getFormatTime(endTime - startTime));

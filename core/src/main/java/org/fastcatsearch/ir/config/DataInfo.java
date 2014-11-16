@@ -67,8 +67,8 @@ public class DataInfo {
 	public void addSegmentInfo(SegmentInfo segmentInfo) {
 		logger.debug("#### addSegmentInfo >> {}", segmentInfo);
 		segmentInfoList.add(segmentInfo);
-		RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-		addUpdate(revisionInfo.getInsertCount(), revisionInfo.getUpdateCount(), revisionInfo.getDeleteCount());
+		//RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
+		addUpdate(segmentInfo.getInsertCount(), segmentInfo.getUpdateCount(), segmentInfo.getDeleteCount());
 	}
 
 	public void updateSegmentInfo(SegmentInfo segmentInfo) {
@@ -77,8 +77,8 @@ public class DataInfo {
 			SegmentInfo prevSegmentInfo = segmentInfoList.get(index);
 			//마지막 세그먼트를 덮어쓴다.
 			prevSegmentInfo.update(segmentInfo);
-			RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-			addUpdate(revisionInfo.getInsertCount(), revisionInfo.getUpdateCount(), revisionInfo.getDeleteCount());
+//			RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
+			addUpdate(segmentInfo.getInsertCount(), segmentInfo.getUpdateCount(), segmentInfo.getDeleteCount());
 			//존재할 경우 리비전만 업데이트한다.
 		} else {
 			addSegmentInfo(segmentInfo);
@@ -147,17 +147,29 @@ public class DataInfo {
 	 * updates="5" deletes="0" createTime="2013-06-15 15:20:00" /> </segment>
 	 * */
 	@XmlRootElement(name = "segment")
-	@XmlType(propOrder = { "revisionInfo", "baseNumber", "id" })
+	@XmlType(propOrder = { "createTime", "deleteCount", "updateCount", "insertCount", "documentCount", "baseNumber", "uuid", "id" })
 	// , "revision"
 	public static class SegmentInfo implements Comparable<SegmentInfo>{
 		private String id;
 		private int baseNumber;
 		// private int revision;
-		private RevisionInfo revisionInfo;
+//		private RevisionInfo revisionInfo;
+		private String uuid;
+		private int documentCount;
+		private int insertCount;
+		private int updateCount;
+		private int deleteCount;
+		private String createTime;
+		
 
 		public SegmentInfo() {
 			this.id = "0";
-			revisionInfo = new RevisionInfo();
+//			revisionInfo = new RevisionInfo();
+			uuid = generateUUID();
+		}
+		
+		private String generateUUID(){
+			return UUID.randomUUID().toString().replaceAll("-", "");
 		}
 
 		public SegmentInfo(String id, int baseNumber) {
@@ -175,44 +187,57 @@ public class DataInfo {
 			SegmentInfo segmentInfo = new SegmentInfo();
 			segmentInfo.id = id;
 			segmentInfo.baseNumber = baseNumber;
-			segmentInfo.revisionInfo = revisionInfo.copy();
+//			segmentInfo.revisionInfo = revisionInfo.copy();
+			segmentInfo.uuid = uuid;
+			segmentInfo.documentCount = documentCount;
+			segmentInfo.insertCount = insertCount;
+			segmentInfo.updateCount = updateCount;
+			segmentInfo.deleteCount = deleteCount;
+			segmentInfo.createTime = createTime;
 			return segmentInfo;
 		}
 
 		public void resetRevisionInfo() {
-			revisionInfo.setInsertCount(0);
-			revisionInfo.setUpdateCount(0);
-			revisionInfo.setDeleteCount(0);
+			insertCount = 0;
+			updateCount = 0;
+			deleteCount = 0;
 		}
 
 		public String toString() {
-			return "[SegmentInfo] id[" + id + "] base[" + baseNumber + "] " + revisionInfo;
+			return "[SegmentInfo] id[" + id + "] base[" + baseNumber + "] uuid[" + uuid + "] documents[" + documentCount + "] inserts[" + insertCount + "] updates[" + updateCount
+					+ "] deletes[" + deleteCount + "] createTime[" + createTime + "]";
 		}
 
 		public void update(SegmentInfo segmentInfo) {
 			this.id = segmentInfo.id;
 			this.baseNumber = segmentInfo.baseNumber;
-			this.revisionInfo = segmentInfo.revisionInfo;
+//			this.revisionInfo = segmentInfo.revisionInfo;
+			this.uuid = segmentInfo.uuid;
+			this.documentCount = segmentInfo.documentCount;
+			this.insertCount = segmentInfo.insertCount;
+			this.updateCount = segmentInfo.updateCount;
+			this.deleteCount = segmentInfo.deleteCount;
+			this.createTime = segmentInfo.createTime;
 		}
 
 		// id와 baseNumber는 변경되지 않는다.
 		// TODO 상위 data info 의 문서수도 변경되야 한다.
-		public void updateRevision(RevisionInfo revisionInfo) {
-			logger.debug("updateRevision > {}", revisionInfo);
-			if (revisionInfo == null) {
-				return;
-			}
-
-			// this.revision = revisionInfo.id;
-			if (this.revisionInfo != null) {
-				// 누적숫자로 유지한다.
-				revisionInfo.documentCount += this.revisionInfo.documentCount;
-				
-//				revisionInfo.updateCount += this.revisionInfo.updateCount;
-//				revisionInfo.deleteCount += this.revisionInfo.deleteCount;
-			}
-			this.revisionInfo = revisionInfo;
-		}
+//		public void updateRevision(RevisionInfo revisionInfo) {
+//			logger.debug("updateRevision > {}", revisionInfo);
+//			if (revisionInfo == null) {
+//				return;
+//			}
+//
+//			// this.revision = revisionInfo.id;
+//			if (this.revisionInfo != null) {
+//				// 누적숫자로 유지한다.
+//				revisionInfo.documentCount += this.revisionInfo.documentCount;
+//				
+////				revisionInfo.updateCount += this.revisionInfo.updateCount;
+////				revisionInfo.deleteCount += this.revisionInfo.deleteCount;
+//			}
+//			this.revisionInfo = revisionInfo;
+//		}
 
 		@XmlAttribute
 		public String getId() {
@@ -236,136 +261,23 @@ public class DataInfo {
 			this.baseNumber = baseNumber;
 		}
 
-		public int getRevision() {
-			return revisionInfo.getId();
-		}
+//		public int getRevision() {
+//			return revisionInfo.getId();
+//		}
 
-		public String getRevisionName() {
-			return Integer.toString(revisionInfo.getId());
-		}
+//		public String getRevisionName() {
+//			return Integer.toString(revisionInfo.getId());
+//		}
 
-		@XmlElement(name = "revision")
-		public RevisionInfo getRevisionInfo() {
-			return revisionInfo;
-		}
-
-		public void setRevisionInfo(RevisionInfo revisionInfo) {
-			this.revisionInfo = revisionInfo;
-		}
-
-		public String getNextId() {
-			return Integer.toString(Integer.parseInt(id) + 1);
-		}
-
-		public int nextRevision() {
-			if (revisionInfo != null) {
-				return revisionInfo.nextRevision();
-			} else {
-				revisionInfo = new RevisionInfo();
-				return revisionInfo.getId();
-			}
-		}
-
-		public int getNextBaseNumber() {
-			if(revisionInfo.documentCount > 0) {
-				return baseNumber + revisionInfo.documentCount;
-			} else {
-				return -1;
-			}
-		}
-
-		public SegmentInfo getNextSegmentInfo() {
-			SegmentInfo nextSegmentInfo = new SegmentInfo();
-			nextSegmentInfo.id = getNextId();
-			nextSegmentInfo.baseNumber = getNextBaseNumber();
-			return nextSegmentInfo;
-		}
-
-		@Override
-		public int compareTo(SegmentInfo o) {
-			return Integer.parseInt(id) - Integer.parseInt(o.id);
-		}
+//		@XmlElement(name = "revision")
+//		public RevisionInfo getRevisionInfo() {
+//			return revisionInfo;
+//		}
+//
+//		public void setRevisionInfo(RevisionInfo revisionInfo) {
+//			this.revisionInfo = revisionInfo;
+//		}
 		
-	}
-
-	/**
-	 * <revision id="1" ref="0" documents="1000" insertCount="990" updates="10"
-	 * deletes="0" createTime="2013-06-15 15:20:00">
-	 * */
-	@XmlType(propOrder = { "createTime", "deleteCount", "updateCount", "insertCount", "documentCount", "ref", "id" })
-	@XmlRootElement(name = "revision")
-	public static class RevisionInfo {
-
-		private int id;
-		private String uuid;
-		private int ref;
-		private int documentCount;
-		private int insertCount;
-		private int updateCount;
-		private int deleteCount;
-		private String createTime;
-
-		public RevisionInfo() {
-			uuid = generateUUID();
-		}
-
-		private String generateUUID(){
-			return UUID.randomUUID().toString().replaceAll("-", "");
-		}
-		
-		public RevisionInfo(int id, String uuid, int documentCount, int insertCount, int updateCount, int deleteCount, String createTime) {
-			this.id = id;
-			this.uuid = uuid;
-			this.ref = id;
-			this.documentCount = documentCount;
-			this.insertCount = insertCount;
-			this.updateCount = updateCount;
-			this.deleteCount = deleteCount;
-			this.createTime = createTime;
-		}
-
-		public boolean isAppend() {
-			return id > 0;
-		}
-
-		public RevisionInfo copy() {
-			RevisionInfo revisionInfo = new RevisionInfo();
-			revisionInfo.id = id;
-			revisionInfo.uuid = uuid;
-			revisionInfo.ref = ref;
-			revisionInfo.documentCount = documentCount;
-			revisionInfo.insertCount = insertCount;
-			revisionInfo.updateCount = updateCount;
-			revisionInfo.deleteCount = deleteCount;
-			revisionInfo.createTime = createTime;
-			return revisionInfo;
-		}
-
-		public int nextRevision() {
-			id++;
-			uuid = generateUUID();
-			return id;
-		}
-
-		// ref와 revision을 동일하게 맞춘다.
-		public void setRefWithRevision() {
-			ref = id;
-		}
-
-		public String toString() {
-			return "[RevisionInfo] id[" + id + "] uuid[" + uuid + "] ref[" + ref + "] documents[" + documentCount + "] inserts[" + insertCount + "] updates[" + updateCount
-					+ "] deletes[" + deleteCount + "] createTime[" + createTime + "]";
-		}
-
-		@XmlAttribute(name = "id")
-		public int getId() {
-			return id;
-		}
-
-		public void setId(int id) {
-			this.id = id;
-		}
-
 		@XmlAttribute(name = "uuid")
 		public String getUuid() {
 			return uuid;
@@ -373,15 +285,6 @@ public class DataInfo {
 
 		public void setUuid(String uuid) {
 			this.uuid = uuid;
-		}
-
-		@XmlAttribute(name = "ref")
-		public int getRef() {
-			return ref;
-		}
-
-		public void setRef(int ref) {
-			this.ref = ref;
 		}
 
 		@XmlAttribute(name = "documents")
@@ -429,12 +332,188 @@ public class DataInfo {
 			this.createTime = createTime;
 		}
 
-		public void add(RevisionInfo revisionInfo) {
-			this.documentCount += revisionInfo.documentCount;
-			this.insertCount += revisionInfo.insertCount;
-			this.updateCount += revisionInfo.updateCount;
-			this.deleteCount += revisionInfo.deleteCount;
+		public String getNextId() {
+			return Integer.toString(Integer.parseInt(id) + 1);
 		}
+
+//		public int nextRevision() {
+//			if (uuid != null) {
+//				return getNextId()
+//			} else {
+//				revisionInfo = new RevisionInfo();
+//				return revisionInfo.getId();
+//			}
+//		}
+
+		public int getNextBaseNumber() {
+			if(documentCount > 0) {
+				return baseNumber + documentCount;
+			} else {
+				return -1;
+			}
+		}
+
+		public SegmentInfo getNextSegmentInfo() {
+			SegmentInfo nextSegmentInfo = new SegmentInfo();
+			nextSegmentInfo.id = getNextId();
+			nextSegmentInfo.baseNumber = getNextBaseNumber();
+			return nextSegmentInfo;
+		}
+
+		@Override
+		public int compareTo(SegmentInfo o) {
+			return Integer.parseInt(id) - Integer.parseInt(o.id);
+		}
+		
 	}
+
+	/**
+	 * <revision id="1" ref="0" documents="1000" insertCount="990" updates="10"
+	 * deletes="0" createTime="2013-06-15 15:20:00">
+	 * */
+//	@XmlType(propOrder = { "createTime", "deleteCount", "updateCount", "insertCount", "documentCount", "ref", "id" })
+//	@XmlRootElement(name = "revision")
+//	public static class RevisionInfo {
+//
+//		private int id;
+//		private String uuid;
+//		private int ref;
+//		private int documentCount;
+//		private int insertCount;
+//		private int updateCount;
+//		private int deleteCount;
+//		private String createTime;
+//
+//		public RevisionInfo() {
+//			uuid = generateUUID();
+//		}
+//
+//		private String generateUUID(){
+//			return UUID.randomUUID().toString().replaceAll("-", "");
+//		}
+//		
+//		public RevisionInfo(int id, String uuid, int documentCount, int insertCount, int updateCount, int deleteCount, String createTime) {
+//			this.id = id;
+//			this.uuid = uuid;
+//			this.ref = id;
+//			this.documentCount = documentCount;
+//			this.insertCount = insertCount;
+//			this.updateCount = updateCount;
+//			this.deleteCount = deleteCount;
+//			this.createTime = createTime;
+//		}
+//
+//		public boolean isAppend() {
+//			return id > 0;
+//		}
+//
+//		public RevisionInfo copy() {
+//			RevisionInfo revisionInfo = new RevisionInfo();
+//			revisionInfo.id = id;
+//			revisionInfo.uuid = uuid;
+//			revisionInfo.ref = ref;
+//			revisionInfo.documentCount = documentCount;
+//			revisionInfo.insertCount = insertCount;
+//			revisionInfo.updateCount = updateCount;
+//			revisionInfo.deleteCount = deleteCount;
+//			revisionInfo.createTime = createTime;
+//			return revisionInfo;
+//		}
+//
+//		public int nextRevision() {
+//			id++;
+//			uuid = generateUUID();
+//			return id;
+//		}
+//
+//		// ref와 revision을 동일하게 맞춘다.
+//		public void setRefWithRevision() {
+//			ref = id;
+//		}
+//
+//		public String toString() {
+//			return "[RevisionInfo] id[" + id + "] uuid[" + uuid + "] ref[" + ref + "] documents[" + documentCount + "] inserts[" + insertCount + "] updates[" + updateCount
+//					+ "] deletes[" + deleteCount + "] createTime[" + createTime + "]";
+//		}
+//
+//		@XmlAttribute(name = "id")
+//		public int getId() {
+//			return id;
+//		}
+//
+//		public void setId(int id) {
+//			this.id = id;
+//		}
+//
+//		@XmlAttribute(name = "uuid")
+//		public String getUuid() {
+//			return uuid;
+//		}
+//
+//		public void setUuid(String uuid) {
+//			this.uuid = uuid;
+//		}
+//
+//		@XmlAttribute(name = "ref")
+//		public int getRef() {
+//			return ref;
+//		}
+//
+//		public void setRef(int ref) {
+//			this.ref = ref;
+//		}
+//
+//		@XmlAttribute(name = "documents")
+//		public int getDocumentCount() {
+//			return documentCount;
+//		}
+//
+//		public void setDocumentCount(int documentCount) {
+//			this.documentCount = documentCount;
+//		}
+//
+//		@XmlAttribute(name = "inserts")
+//		public int getInsertCount() {
+//			return insertCount;
+//		}
+//
+//		public void setInsertCount(int insertCount) {
+//			this.insertCount = insertCount;
+//		}
+//
+//		@XmlAttribute(name = "updates")
+//		public int getUpdateCount() {
+//			return updateCount;
+//		}
+//
+//		public void setUpdateCount(int updateCount) {
+//			this.updateCount = updateCount;
+//		}
+//
+//		@XmlAttribute(name = "deletes")
+//		public int getDeleteCount() {
+//			return deleteCount;
+//		}
+//
+//		public void setDeleteCount(int deleteCount) {
+//			this.deleteCount = deleteCount;
+//		}
+//
+//		@XmlAttribute
+//		public String getCreateTime() {
+//			return createTime;
+//		}
+//
+//		public void setCreateTime(String createTime) {
+//			this.createTime = createTime;
+//		}
+//
+//		public void add(RevisionInfo revisionInfo) {
+//			this.documentCount += revisionInfo.documentCount;
+//			this.insertCount += revisionInfo.insertCount;
+//			this.updateCount += revisionInfo.updateCount;
+//			this.deleteCount += revisionInfo.deleteCount;
+//		}
+//	}
 
 }

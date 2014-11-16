@@ -23,17 +23,14 @@ import java.util.zip.Deflater;
 
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.IndexFileNames;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.field.Field;
 import org.fastcatsearch.ir.index.IndexWriteInfoList;
 import org.fastcatsearch.ir.index.WriteInfoLoggable;
-import org.fastcatsearch.ir.io.BufferedFileInput;
 import org.fastcatsearch.ir.io.BufferedFileOutput;
 import org.fastcatsearch.ir.io.BytesDataOutput;
-import org.fastcatsearch.ir.io.IndexInput;
 import org.fastcatsearch.ir.settings.FieldSetting;
-import org.fastcatsearch.ir.settings.Schema;
 import org.fastcatsearch.ir.settings.SchemaSetting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,26 +61,26 @@ public class DocumentWriter implements WriteInfoLoggable {
 	private Deflater compressor;
 	private int count; //현 색인시 추가문서갯수.
 	
-	public DocumentWriter(SchemaSetting schemaSetting, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig) throws IOException, IRException {
+	public DocumentWriter(SchemaSetting schemaSetting, File dir, IndexConfig indexConfig) throws IOException, IRException {
 		
-		boolean isAppend = revisionInfo.isAppend();
+//		boolean isAppend = revisionInfo.isAppend();
 		
 		compressor = new Deflater(Deflater.BEST_SPEED);
 		fields = schemaSetting.getFieldSettingList();
 		
-		docOutput = new BufferedFileOutput(dir, IndexFileNames.docStored, isAppend);
-		positionOutput = new BufferedFileOutput(dir, IndexFileNames.docPosition, isAppend);
+		docOutput = new BufferedFileOutput(dir, IndexFileNames.docStored);
+		positionOutput = new BufferedFileOutput(dir, IndexFileNames.docPosition);
 
 		fbaos = new BytesDataOutput(3 * 1024 * 1024); //초기 3Mb로 시작.
 		workingBuffer = new byte[1024];
 
-		if (isAppend) {
-			IndexInput docInput = new BufferedFileInput(dir, IndexFileNames.docStored);
-			totalCount = docInput.readInt();
-			docInput.close();
-		} else {
+//		if (isAppend) {
+//			IndexInput docInput = new BufferedFileInput(dir, IndexFileNames.docStored);
+//			totalCount = docInput.readInt();
+//			docInput.close();
+//		} else {
 			docOutput.writeInt(0); // document count
-		}
+//		}
 
 	}
 

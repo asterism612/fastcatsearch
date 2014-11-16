@@ -23,7 +23,7 @@ import org.apache.commons.io.FileUtils;
 import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.IndexFileNames;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.document.Document;
 import org.fastcatsearch.ir.document.DocumentWriter;
@@ -37,18 +37,18 @@ public class SegmentWriter extends SegmentIndexWriter implements WriteInfoLoggab
 
 	@Deprecated
 	public SegmentWriter(Schema schema, File targetDir, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager) throws IRException {
-		this(schema, targetDir, new RevisionInfo(), indexConfig, analyzerPoolManager);
+		this(schema, targetDir, new SegmentInfo(), indexConfig, analyzerPoolManager);
 	}
 
-	public SegmentWriter(Schema schema, File targetDir, RevisionInfo revisionInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager) throws IRException {
-		this(schema, targetDir, revisionInfo, indexConfig, analyzerPoolManager, null);
+	public SegmentWriter(Schema schema, File targetDir, SegmentInfo segmentInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager) throws IRException {
+		this(schema, targetDir, segmentInfo, indexConfig, analyzerPoolManager, null);
 	}
 	
-	public SegmentWriter(Schema schema, File targetDir, RevisionInfo revisionInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager, SelectedIndexList selectedIndexList) throws IRException {
-		super(schema, targetDir, revisionInfo, indexConfig, analyzerPoolManager, selectedIndexList);
+	public SegmentWriter(Schema schema, File targetDir, SegmentInfo segmentInfo, IndexConfig indexConfig, AnalyzerPoolManager analyzerPoolManager, SelectedIndexList selectedIndexList) throws IRException {
+		super(schema, targetDir, segmentInfo, indexConfig, analyzerPoolManager, selectedIndexList);
 		try {
 			lastDocNo = -1;
-			documentWriter = new DocumentWriter(schema.schemaSetting(), targetDir, revisionInfo, indexConfig);
+			documentWriter = new DocumentWriter(schema.schemaSetting(), targetDir, indexConfig);
 		} catch (IOException e) {
 			try {
 				closeWriter();
@@ -92,9 +92,9 @@ public class SegmentWriter extends SegmentIndexWriter implements WriteInfoLoggab
 		try {
 			closeWriter();
 		} catch (Exception e) {
-			File revisionDir = IndexFileNames.getRevisionDir(targetDir, revisionInfo.getId());
+//			File revisionDir = IndexFileNames.getRevisionDir(targetDir, revisionInfo.getId());
 			//FileUtils.deleteDirectory(revisionDir);
-			FileUtils.forceDelete(revisionDir);
+			FileUtils.forceDelete(targetDir);
 			throw new IRException(e);
 		} finally {
 			super.close();

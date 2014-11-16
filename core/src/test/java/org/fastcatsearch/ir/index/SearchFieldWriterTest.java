@@ -24,7 +24,7 @@ import junit.framework.TestCase;
 import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.SettingException;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
+import org.fastcatsearch.ir.config.DataInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.document.Document;
 import org.fastcatsearch.ir.document.DocumentReader;
@@ -44,7 +44,7 @@ public class SearchFieldWriterTest extends TestCase{
 		IndexConfig indexConfig = null;
 		DocumentReader reader = new DocumentReader(schemaSetting, targetDir);
 		AnalyzerPoolManager analyzerPoolManager = null;
-		SearchIndexesWriter writer = new SearchIndexesWriter(schema, targetDir, new RevisionInfo(), indexConfig, analyzerPoolManager);
+		SearchIndexesWriter writer = new SearchIndexesWriter(schema, targetDir, new DataInfo.SegmentInfo(), indexConfig, analyzerPoolManager);
 		int documentCount = reader.getDocumentCount();
 		for (int docNo = 0; docNo < documentCount; docNo++) {
 			Document doc = reader.readDocument(docNo);

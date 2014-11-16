@@ -67,23 +67,28 @@ public class CollectionAddIndexer extends AbstractCollectionIndexer {
 				DataPlanConfig dataPlanConfig = collectionContext.collectionConfig().getDataPlanConfig();
 				int segmentDocumentLimit = dataPlanConfig.getSegmentDocumentLimit();
 
-				if (docCount >= segmentDocumentLimit) {
-					// segment가 생성되는 증분색인.
-					workingSegmentInfo = segmentInfo.getNextSegmentInfo();
-					File segmentDir = indexFilePaths.file(workingSegmentInfo.getId());
-					logger.debug("#색인시 세그먼트를 생성합니다. {}", workingSegmentInfo);
-					CoreFileUtils.removeDirectoryCascade(segmentDir);
-				} else {
-					// 기존 segment에 append되는 증분색인.
-					workingSegmentInfo = segmentInfo.copy();
-					// 리비전을 증가시킨다.
-					logger.debug("#old seginfo {}", workingSegmentInfo);
-					int revision = workingSegmentInfo.nextRevision();
-					File segmentDir = indexFilePaths.file(workingSegmentInfo.getId());
-					File revisionDir = new File(segmentDir, Integer.toString(revision));
-					CoreFileUtils.removeDirectoryCascade(revisionDir);
-					logger.debug("#색인시 리비전을 증가합니다. {}", workingSegmentInfo);
-				}
+				workingSegmentInfo = segmentInfo.getNextSegmentInfo();
+				File segmentDir = indexFilePaths.file(workingSegmentInfo.getId());
+				logger.debug("#색인시 세그먼트를 생성합니다. {}", workingSegmentInfo);
+				CoreFileUtils.removeDirectoryCascade(segmentDir);
+				
+//				if (docCount >= segmentDocumentLimit) {
+//					// segment가 생성되는 증분색인.
+//					workingSegmentInfo = segmentInfo.getNextSegmentInfo();
+//					File segmentDir = indexFilePaths.file(workingSegmentInfo.getId());
+//					logger.debug("#색인시 세그먼트를 생성합니다. {}", workingSegmentInfo);
+//					CoreFileUtils.removeDirectoryCascade(segmentDir);
+//				} else {
+//					// 기존 segment에 append되는 증분색인.
+//					workingSegmentInfo = segmentInfo.copy();
+//					// 리비전을 증가시킨다.
+//					logger.debug("#old seginfo {}", workingSegmentInfo);
+//					int revision = workingSegmentInfo.nextRevision();
+//					File segmentDir = indexFilePaths.file(workingSegmentInfo.getId());
+//					File revisionDir = new File(segmentDir, Integer.toString(revision));
+//					CoreFileUtils.removeDirectoryCascade(revisionDir);
+//					logger.debug("#색인시 리비전을 증가합니다. {}", workingSegmentInfo);
+//				}
 			} else {
 				// TODO 전체색인이 없는데 증분색인이 가능하도록 해야하나?
 

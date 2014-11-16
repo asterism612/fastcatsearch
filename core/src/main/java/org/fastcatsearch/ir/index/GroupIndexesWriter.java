@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.fastcatsearch.ir.common.IRException;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.document.Document;
 import org.fastcatsearch.ir.settings.GroupIndexSetting;
@@ -22,11 +22,11 @@ public class GroupIndexesWriter implements WriteInfoLoggable {
 	private GroupIndexWriter[] groupIndexWriterList;
 	private int indexSize;
 
-	public GroupIndexesWriter(Schema schema, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig) throws IOException, IRException {
-		this(schema, dir, revisionInfo, indexConfig, null);
+	public GroupIndexesWriter(Schema schema, File dir, SegmentInfo segmentInfo, IndexConfig indexConfig) throws IOException, IRException {
+		this(schema, dir, segmentInfo, indexConfig, null);
 	}
 
-	public GroupIndexesWriter(Schema schema, File dir, RevisionInfo revisionInfo, IndexConfig indexConfig, List<String> indexIdList) throws IOException, IRException {
+	public GroupIndexesWriter(Schema schema, File dir, SegmentInfo segmentInfo, IndexConfig indexConfig, List<String> indexIdList) throws IOException, IRException {
 		List<GroupIndexSetting> groupIndexSettingList = schema.schemaSetting().getGroupIndexSettingList();
 		int totalSize = groupIndexSettingList == null ? 0 : groupIndexSettingList.size();
 
@@ -34,7 +34,7 @@ public class GroupIndexesWriter implements WriteInfoLoggable {
 		for (int i = 0; i < totalSize; i++) {
 			GroupIndexSetting indexSetting = groupIndexSettingList.get(i);
 			if (indexIdList == null || indexIdList.contains(indexSetting.getId())) {
-				GroupIndexWriter groupIndexWriter = new GroupIndexWriter(indexSetting, schema.fieldSettingMap(), schema.fieldSequenceMap(), dir, revisionInfo, indexConfig);
+				GroupIndexWriter groupIndexWriter = new GroupIndexWriter(indexSetting, schema.fieldSettingMap(), schema.fieldSequenceMap(), dir, segmentInfo, indexConfig);
 				list.add(groupIndexWriter);
 			}
 		}
