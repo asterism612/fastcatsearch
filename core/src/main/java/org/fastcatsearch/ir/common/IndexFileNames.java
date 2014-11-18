@@ -102,9 +102,9 @@ public class IndexFileNames {
 		return name + ".index";
 	}
 	
-	public static File getRevisionDir(File parent, int revision){
-		return new File(parent, Integer.toString(revision));
-	}
+//	public static File getRevisionDir(File parent, int revision){
+//		return new File(parent, Integer.toString(revision));
+//	}
 	
 //	public static File getBackupDir(File parent, int revision){
 //		return new File(parent, ".bak."+revision);

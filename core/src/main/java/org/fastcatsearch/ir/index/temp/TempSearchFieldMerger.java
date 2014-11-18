@@ -69,11 +69,9 @@ public class TempSearchFieldMerger {
 			return;
 		}
 
-		IndexOutput postingOutput = new BufferedFileOutput(IndexFileNames.getRevisionDir(baseDir, 0),
-				IndexFileNames.getSearchPostingFileName(indexId));
-		IndexOutput lexiconOutput = new BufferedFileOutput(IndexFileNames.getRevisionDir(baseDir, 0),
-				IndexFileNames.getSearchLexiconFileName(indexId));
-		IndexOutput indexOutput = new BufferedFileOutput(IndexFileNames.getRevisionDir(baseDir, 0), IndexFileNames.getSearchIndexFileName(indexId));
+		IndexOutput postingOutput = new BufferedFileOutput(baseDir, IndexFileNames.getSearchPostingFileName(indexId));
+		IndexOutput lexiconOutput = new BufferedFileOutput(baseDir, IndexFileNames.getSearchLexiconFileName(indexId));
+		IndexOutput indexOutput = new BufferedFileOutput(baseDir, IndexFileNames.getSearchIndexFileName(indexId));
 
 		try {
 			postingOutput.writeInt(fieldIndexOption.value());

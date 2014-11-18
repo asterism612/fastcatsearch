@@ -127,15 +127,15 @@ public class CollectionHandler {
 		// logger.debug("segmentInfoList > {}, {}", segmentInfoList.size(), segmentInfoList);
 		if (segmentSize > 0) {
 			// 0,1,2...차례대로 list에 존재해야한다. deleteset을 적용해야하기때문에..
-			SegmentInfo lastSegmentInfo = segmentInfoList.get(segmentSize - 1);
+//			SegmentInfo lastSegmentInfo = segmentInfoList.get(segmentSize - 1);
 //			File lastRevisionDir = dataPaths.revisionFile(dataSequence, lastSegmentInfo.getId(), lastSegmentInfo.getRevision());
-			File lastSegmentDir = dataPaths.segmentFile(dataSequence, lastSegmentInfo.getId());
+//			File lastSegmentDir = dataPaths.segmentFile(dataSequence, lastSegmentInfo.getId());
 			try {
 				for (SegmentInfo segmentInfo : collectionContext.dataInfo().getSegmentInfoList()) {
 					File segmentDir = dataPaths.segmentFile(dataSequence, segmentInfo.getId());
-					// 삭제문서는 마지막 세그먼트의 마지막 리비전에 최신 업데이트 파일이 있으므로, 그것을 로딩한다.
-					BitSet deleteSet = new BitSet(lastSegmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
-					segmentReaderList.add(new SegmentReader(segmentInfo, schema, segmentDir, deleteSet, analyzerPoolManager));
+//					 삭제문서는 마지막 세그먼트의 마지막 리비전에 최신 업데이트 파일이 있으므로, 그것을 로딩한다.
+//					BitSet deleteSet = new BitSet(lastSegmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
+					segmentReaderList.add(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
 					logger.debug("{}", segmentInfo);
 				}
 			} catch (IOException e) {
@@ -207,7 +207,11 @@ public class CollectionHandler {
 	private void addSegmentReader(SegmentReader segmentReader) {
 		segmentReaderList.add(segmentReader);
 		// info.xml 파일업데이트용.
-		collectionContext.updateSegmentInfo(segmentReader.segmentInfo());
+//		collectionContext.updateSegmentInfo(segmentReader.segmentInfo());
+		
+		
+		
+		
 	}
 
 	// segment reader 교체.
@@ -282,17 +286,13 @@ public class CollectionHandler {
 					reader.close();
 				}
 			}
+			FileUtils.deleteQuietly(deleteListFile);
 		}
 		
 		BitSet[] deleteSetList = new BitSet[segmentReaderList.size()];
 		String segmentId = segmentInfo.getId();
-		for (SegmentReader segmentReader : segmentReaderList) {
-			File prevSegmentDir = segmentReader.segmentDir();
-			// 복사해온 delete.set.#들을 기존 pk들을 확인하면서 update해준다. 파일에 write까지 수행됨.
-			// 예를들어 현재 segment가 5이면 수정파일은 delete.set.0,1,2,3,4 이다.
-			
-			updateDeleteSetWithSegments(segmentId, prevSegmentDir, deleteIdSet, deleteSetList);
-		}
+		updateDeleteSetWithSegments(segmentId, segmentDir, deleteIdSet, deleteSetList);
+		
 		//적용
 		for (int i = 0; i < segmentReaderList.size(); i++) {
 			segmentReaderList.get(i).setDeleteSet(deleteSetList[i]);
@@ -312,11 +312,10 @@ public class CollectionHandler {
 		for (int i = 0; i < prevSegmentSize; i++) {
 			SegmentReader prevSegmentReader = segmentReaderList.get(i);
 			File prevSegmentDir = prevSegmentReader.segmentDir();
-			String id = prevSegmentReader.segmentInfo().getId();
-			
-			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
-			File f1 = new File(prevSegmentDir, filename);
-			File f2 = new File(prevSegmentDir, filename +".tmp");
+//			String id = prevSegmentReader.segmentInfo().getId();
+//			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
+			File f1 = new File(prevSegmentDir, IndexFileNames.docDeleteSet);
+			File f2 = new File(prevSegmentDir, IndexFileNames.docDeleteSet +".tmp");
 			FileUtils.copyFile(f1, f2);
 			
 			prevPkReaderList[i] = new PrimaryKeyIndexReader(prevSegmentDir, IndexFileNames.primaryKeyMap);
@@ -340,10 +339,10 @@ public class CollectionHandler {
 		for (int i = 0; i < prevSegmentSize; i++) {
 			SegmentReader prevSegmentReader = segmentReaderList.get(i);
 			File prevSegmentDir = prevSegmentReader.segmentDir();
-			String id = prevSegmentReader.segmentInfo().getId();
-			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
-			File f1 = new File(prevSegmentDir, filename);
-			File f2 = new File(prevSegmentDir, filename +".tmp");
+//			String id = prevSegmentReader.segmentInfo().getId();
+//			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
+			File f1 = new File(prevSegmentDir, IndexFileNames.docDeleteSet);
+			File f2 = new File(prevSegmentDir, IndexFileNames.docDeleteSet +".tmp");
 			FileUtils.copyFile(f2, f1);
 			FileUtils.deleteQuietly(f2);
 			prevDeleteSetList[i] = new BitSet(f1);
@@ -514,119 +513,119 @@ public class CollectionHandler {
 
 
 
-	private void copyDeleteSet(List<SegmentReader> prevSegmentReaderList, File sourceDir, File targetDir) throws IOException {
-		for (SegmentReader prevSegmentReader : prevSegmentReaderList) {
-			String segmentId = prevSegmentReader.segmentInfo().getId();
-			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId);
-			File f1 = new File(sourceDir, filename);
-			File f2 = new File(targetDir, filename);
-			logger.debug("Copy file {}=>{}", f1.getAbsolutePath(), f2.getAbsolutePath());
-			FileUtils.copyFile(f1, f2);
-		}
-
-	}
-
-	private void copyPrimaryKeyAndDeleteTemp(File sourceDir, File targetDir) throws IOException {
-		logger.debug("COPY primarykey!");
-		String indexFilename = IndexFileNames.getIndexFileName(IndexFileNames.primaryKeyMap);
-		FileUtils.copyFile(new File(sourceDir, IndexFileNames.primaryKeyMap), new File(targetDir, IndexFileNames.primaryKeyMap));
-		FileUtils.copyFile(new File(sourceDir, indexFilename), new File(targetDir, indexFilename));
-
-		String tempPkFilename = IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap);
-		new File(targetDir, tempPkFilename).delete();
-		new File(targetDir, IndexFileNames.getIndexFileName(tempPkFilename)).delete();
-
-	}
-
-	/*
-	 * 1. 이전 revision을 바탕으로 새 revision의 PK를 비교하여 Merge하고 2. docDeleteSet도 업데이트한다.
-	 */
-	private void mergePrimaryKeyWithPrevRevision(String segmentId, File prevRevisionDir, File targetRevisionDir) throws IOException {
-		logger.debug("MERGE primarykey!");
-		//
-		// 이전 revision의 pk와 현재 revision의 pk를 머징하고 중복된 문서번호는 deleteSet에 넣는다.
-		//
-		int indexInterval = collectionContext.indexConfig().getPkTermInterval();
-		BitSet revDeleteSet = new BitSet(targetRevisionDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
-		File prevRevisionPkFile = new File(prevRevisionDir, IndexFileNames.primaryKeyMap);
-
-		String tempPkFilename = IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap);
-		File tempPkFile = new File(targetRevisionDir, tempPkFilename);
-		File newPkFile = new File(targetRevisionDir, IndexFileNames.primaryKeyMap);
-		if (tempPkFile.exists()) {
-			logger.debug("MERGE PK {} AND {} => {}", new Object[] { prevRevisionPkFile.getPath(), tempPkFile.getPath(), newPkFile.getPath() });
-			// 동일세그먼트내에서 이전 rev와 새 rev사이의 중복문서가 발견횟수를 증가시킨다.
-			int updateDocumentCount = new PrimaryKeyIndexMerger().merge(prevRevisionPkFile, tempPkFile, newPkFile, indexInterval, revDeleteSet);
-			logger.debug("UPDATE SIZE after merge = {}", updateDocumentCount);
-			revDeleteSet.save();
-			// temp PK .index파일은 pk파일을 만들때 생성된 것으로, temp PK용도는 bulk용도이므로 .index파일이 필요없다.
-			// 그러므로 삭제!!
-
-			String tempPkIndexFilename = IndexFileNames.getIndexFileName(tempPkFilename);
-			new File(targetRevisionDir, tempPkFilename).delete();
-			new File(targetRevisionDir, tempPkIndexFilename).delete();
-		}
-	}
+//	private void copyDeleteSet(List<SegmentReader> prevSegmentReaderList, File sourceDir, File targetDir) throws IOException {
+//		for (SegmentReader prevSegmentReader : prevSegmentReaderList) {
+//			String segmentId = prevSegmentReader.segmentInfo().getId();
+//			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId);
+//			File f1 = new File(sourceDir, filename);
+//			File f2 = new File(targetDir, filename);
+//			logger.debug("Copy file {}=>{}", f1.getAbsolutePath(), f2.getAbsolutePath());
+//			FileUtils.copyFile(f1, f2);
+//		}
+//
+//	}
+//
+//	private void copyPrimaryKeyAndDeleteTemp(File sourceDir, File targetDir) throws IOException {
+//		logger.debug("COPY primarykey!");
+//		String indexFilename = IndexFileNames.getIndexFileName(IndexFileNames.primaryKeyMap);
+//		FileUtils.copyFile(new File(sourceDir, IndexFileNames.primaryKeyMap), new File(targetDir, IndexFileNames.primaryKeyMap));
+//		FileUtils.copyFile(new File(sourceDir, indexFilename), new File(targetDir, indexFilename));
+//
+//		String tempPkFilename = IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap);
+//		new File(targetDir, tempPkFilename).delete();
+//		new File(targetDir, IndexFileNames.getIndexFileName(tempPkFilename)).delete();
+//
+//	}
+//
+//	/*
+//	 * 1. 이전 revision을 바탕으로 새 revision의 PK를 비교하여 Merge하고 2. docDeleteSet도 업데이트한다.
+//	 */
+//	private void mergePrimaryKeyWithPrevRevision(String segmentId, File prevRevisionDir, File targetRevisionDir) throws IOException {
+//		logger.debug("MERGE primarykey!");
+//		//
+//		// 이전 revision의 pk와 현재 revision의 pk를 머징하고 중복된 문서번호는 deleteSet에 넣는다.
+//		//
+//		int indexInterval = collectionContext.indexConfig().getPkTermInterval();
+//		BitSet revDeleteSet = new BitSet(targetRevisionDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
+//		File prevRevisionPkFile = new File(prevRevisionDir, IndexFileNames.primaryKeyMap);
+//
+//		String tempPkFilename = IndexFileNames.getTempFileName(IndexFileNames.primaryKeyMap);
+//		File tempPkFile = new File(targetRevisionDir, tempPkFilename);
+//		File newPkFile = new File(targetRevisionDir, IndexFileNames.primaryKeyMap);
+//		if (tempPkFile.exists()) {
+//			logger.debug("MERGE PK {} AND {} => {}", new Object[] { prevRevisionPkFile.getPath(), tempPkFile.getPath(), newPkFile.getPath() });
+//			// 동일세그먼트내에서 이전 rev와 새 rev사이의 중복문서가 발견횟수를 증가시킨다.
+//			int updateDocumentCount = new PrimaryKeyIndexMerger().merge(prevRevisionPkFile, tempPkFile, newPkFile, indexInterval, revDeleteSet);
+//			logger.debug("UPDATE SIZE after merge = {}", updateDocumentCount);
+//			revDeleteSet.save();
+//			// temp PK .index파일은 pk파일을 만들때 생성된 것으로, temp PK용도는 bulk용도이므로 .index파일이 필요없다.
+//			// 그러므로 삭제!!
+//
+//			String tempPkIndexFilename = IndexFileNames.getIndexFileName(tempPkFilename);
+//			new File(targetRevisionDir, tempPkFilename).delete();
+//			new File(targetRevisionDir, tempPkIndexFilename).delete();
+//		}
+//	}
 
 	
 
 	/*
 	 * 색인시 수집된 삭제문서리스트 deleteIdSet를 각 deleteSet에 적용한다. pk파일에 들어있다면 문서가 존재하는 것이므로 deleteSet에 업데이트해준다.
 	 */
-	private int applyDeleteIdSetToAllSegments(String segmentId, File segmentDir, DeleteIdSet deleteIdSet, PrimaryKeyIndexReader[] prevPkReaderList,
-			BitSet[] prevDeleteSetList) throws IOException {
-
-		int deleteDocumentSize = 0;
-
-		if (deleteIdSet == null) {
-			return deleteDocumentSize;
-		}
-		PrimaryKeysToBytesRef primaryKeysToBytesRef = new PrimaryKeysToBytesRef(schema);
-		/*
-		 * apply delete set. 이번 색인작업을 통해 삭제가 요청된 문서들을 삭제처리한다.
-		 */
-		PrimaryKeyIndexReader currentPkReader = new PrimaryKeyIndexReader(segmentDir, IndexFileNames.primaryKeyMap);
-		BitSet currentDeleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
-		Iterator<PrimaryKeys> iterator = deleteIdSet.iterator();
-		while (iterator.hasNext()) {
-
-			PrimaryKeys ids = iterator.next();
-			logger.debug("--- delete id = {}", ids);
-
-			BytesRef bytesRef = primaryKeysToBytesRef.getBytesRef(ids);
-
-			int localDocNo = currentPkReader.get(bytesRef);
-			if (localDocNo != -1) {
-				// add delete list
-				logger.debug("--- delete localDocNo = {} at current segment", localDocNo);
-				currentDeleteSet.set(localDocNo);
-				deleteDocumentSize++;// deleteSize 증가.
-				// 현재 세그먼트에서 삭제된 pk는, 이전 세그먼트에서 찾아볼필요가 없다.
-				// 왜냐하면 현재세그먼트와 동일한 pk가 이전 세그먼트에 존재한다면 해당 pk는 이미 삭제리스트에 존재할것이기 때문이다.
-				continue;
-			}
-			// backward matching
-			for (int i = prevPkReaderList.length - 1; i >= 0; i--) {
-				localDocNo = prevPkReaderList[i].get(bytesRef);
-				if (localDocNo != -1) {
-					if (!prevDeleteSetList[i].isSet(localDocNo)) {
-						// add delete list
-						logger.debug("--- delete doc[{}] at segment[{}]", localDocNo, i);
-						prevDeleteSetList[i].set(localDocNo);
-						deleteDocumentSize++;// deleteSize 증가.
-					}
-					break;
-				}
-			}
-
-		}
-
-		currentDeleteSet.save();
-
-		currentPkReader.close();
-
-		return deleteDocumentSize;
-	}
+//	private int applyDeleteIdSetToAllSegments(String segmentId, File segmentDir, DeleteIdSet deleteIdSet, PrimaryKeyIndexReader[] prevPkReaderList,
+//			BitSet[] prevDeleteSetList) throws IOException {
+//
+//		int deleteDocumentSize = 0;
+//
+//		if (deleteIdSet == null) {
+//			return deleteDocumentSize;
+//		}
+//		PrimaryKeysToBytesRef primaryKeysToBytesRef = new PrimaryKeysToBytesRef(schema);
+//		/*
+//		 * apply delete set. 이번 색인작업을 통해 삭제가 요청된 문서들을 삭제처리한다.
+//		 */
+//		PrimaryKeyIndexReader currentPkReader = new PrimaryKeyIndexReader(segmentDir, IndexFileNames.primaryKeyMap);
+//		BitSet currentDeleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
+//		Iterator<PrimaryKeys> iterator = deleteIdSet.iterator();
+//		while (iterator.hasNext()) {
+//
+//			PrimaryKeys ids = iterator.next();
+//			logger.debug("--- delete id = {}", ids);
+//
+//			BytesRef bytesRef = primaryKeysToBytesRef.getBytesRef(ids);
+//
+//			int localDocNo = currentPkReader.get(bytesRef);
+//			if (localDocNo != -1) {
+//				// add delete list
+//				logger.debug("--- delete localDocNo = {} at current segment", localDocNo);
+//				currentDeleteSet.set(localDocNo);
+//				deleteDocumentSize++;// deleteSize 증가.
+//				// 현재 세그먼트에서 삭제된 pk는, 이전 세그먼트에서 찾아볼필요가 없다.
+//				// 왜냐하면 현재세그먼트와 동일한 pk가 이전 세그먼트에 존재한다면 해당 pk는 이미 삭제리스트에 존재할것이기 때문이다.
+//				continue;
+//			}
+//			// backward matching
+//			for (int i = prevPkReaderList.length - 1; i >= 0; i--) {
+//				localDocNo = prevPkReaderList[i].get(bytesRef);
+//				if (localDocNo != -1) {
+//					if (!prevDeleteSetList[i].isSet(localDocNo)) {
+//						// add delete list
+//						logger.debug("--- delete doc[{}] at segment[{}]", localDocNo, i);
+//						prevDeleteSetList[i].set(localDocNo);
+//						deleteDocumentSize++;// deleteSize 증가.
+//					}
+//					break;
+//				}
+//			}
+//
+//		}
+//
+//		currentDeleteSet.save();
+//
+//		currentPkReader.close();
+//
+//		return deleteDocumentSize;
+//	}
 
 	public int segmentSize() {
 		if (segmentReaderList == null) {

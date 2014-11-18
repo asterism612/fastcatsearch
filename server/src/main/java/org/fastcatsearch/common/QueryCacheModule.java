@@ -22,9 +22,11 @@ import org.fastcatsearch.util.LRUCache;
 public class QueryCacheModule<K, V> extends AbstractModule {
 
 	private LRUCache<K, V> lruCache;
+	private String name;
 	
-	public QueryCacheModule(Environment environment, Settings settings) {
+	public QueryCacheModule(String name, Environment environment, Settings settings) {
 		super(environment, settings);
+		this.name = name;
 	}
 
 	@Override
@@ -50,5 +52,10 @@ public class QueryCacheModule<K, V> extends AbstractModule {
 
 	public int size() {
 		return lruCache.size();
+	}
+	
+	@Override
+	public String toString() {
+		return name;
 	}
 }

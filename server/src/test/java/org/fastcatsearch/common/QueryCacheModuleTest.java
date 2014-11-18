@@ -13,7 +13,7 @@ public class QueryCacheModuleTest {
 
 		int count = 1000000;
 
-		QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>(null, new Settings());
+		QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>("", null, new Settings());
 		cacheModule.load();
 		long lap = System.nanoTime();
 		for (int i = 0; i < count; i++) {
@@ -38,7 +38,7 @@ public class QueryCacheModuleTest {
 
 		int count = 1000000;
 
-		QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>(null, new Settings());
+		QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>("", null, new Settings());
 		cacheModule.load();
 		long lap = System.nanoTime();
 		for (int i = 0; i < count; i++) {
@@ -61,7 +61,7 @@ public class QueryCacheModuleTest {
 	public void testBulkPutAndGetMultiThread() throws InterruptedException {
 
 		final AtomicInteger totalCount = new AtomicInteger();
-		final QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>(null, new Settings());
+		final QueryCacheModule<String, String> cacheModule = new QueryCacheModule<String, String>("", null, new Settings());
 		cacheModule.load();
 		final AtomicLong lap = new AtomicLong(System.nanoTime());
 

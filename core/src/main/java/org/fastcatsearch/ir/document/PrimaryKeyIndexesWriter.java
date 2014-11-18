@@ -93,8 +93,9 @@ public class PrimaryKeyIndexesWriter {
 //		}
 
 		pkbaos = new BytesDataOutput(1024); //초기 1kb로 시작.
+		deleteSet = new BitSet(segmentDir, IndexFileNames.docDeleteSet, true);
 		
-		String docDeleteSetName = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId);
+//		String docDeleteSetName = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId);
 //		if (isAppend) {
 //			File prevRevisionDir = IndexFileNames.getRevisionDir(dir, revisionInfo.getRef());
 //			// copy prev revision's delete.set
@@ -105,7 +106,7 @@ public class PrimaryKeyIndexesWriter {
 //			FileUtils.copyFileToDirectory(prevDelete, revisionDir);
 //			deleteSet = new BitSet(segmentDir, docDeleteSetName);
 //		} else {
-			deleteSet = new BitSet(segmentDir, docDeleteSetName, true);
+//			deleteSet = new BitSet(segmentDir, docDeleteSetName, true);
 //		}
 	}
 

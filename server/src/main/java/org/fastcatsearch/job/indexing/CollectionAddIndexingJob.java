@@ -12,8 +12,11 @@
 package org.fastcatsearch.job.indexing;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.fastcatsearch.cluster.ClusterUtils;
 import org.fastcatsearch.cluster.Node;
@@ -31,15 +34,16 @@ import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
-import org.fastcatsearch.ir.index.IndexWriteInfoList;
+import org.fastcatsearch.ir.io.DataInput;
+import org.fastcatsearch.ir.io.DataOutput;
 import org.fastcatsearch.ir.search.CollectionHandler;
-import org.fastcatsearch.ir.search.SegmentReader;
 import org.fastcatsearch.job.CacheServiceRestartJob;
 import org.fastcatsearch.job.cluster.NodeCollectionUpdateJob;
 import org.fastcatsearch.job.cluster.NodeDirectoryCleanJob;
 import org.fastcatsearch.job.result.IndexingJobResult;
 import org.fastcatsearch.job.state.IndexingTaskState;
 import org.fastcatsearch.service.ServiceManager;
+import org.fastcatsearch.transport.vo.StreamableCollectionContext;
 import org.fastcatsearch.transport.vo.StreamableThrowable;
 import org.fastcatsearch.util.FilePaths;
 
@@ -52,6 +56,15 @@ public class CollectionAddIndexingJob extends IndexingJob {
 
 	private static final long serialVersionUID = 7898036370433248984L;
 
+	private CollectionContext collectionContext; 
+	
+	public CollectionAddIndexingJob() {
+	}
+	
+	public CollectionAddIndexingJob(CollectionContext collectionContext) {
+		this.collectionContext = collectionContext;
+	}
+	
 	@Override
 	public JobResult doRun() throws FastcatSearchException {
 		
@@ -90,8 +103,9 @@ public class CollectionAddIndexingJob extends IndexingJob {
 				return new JobResult();
 			}
 
+			// 2014-11-18 swsong : 증분색인도 context를 가지고 사용한다.
 			//증분색인은 collection handler자체를 수정하므로 copy하지 않는다.
-//			collectionContext = collectionContext.copy();
+			
 			/*
 			 * Do indexing!!
 			 */
@@ -133,39 +147,18 @@ public class CollectionAddIndexingJob extends IndexingJob {
 				throw new IndexingStopException();
 			}
 			
-			
-			
-			
-			
-			
-			
-			
-			//TODO 삭제요청 아이디를 이미 적용해버렸으므로, 다른 세그먼트에 전달해줄 것이 없다.
-			// 현 세그먼트는 적용되었다고 해도, 타 노드의 이전 세그먼트는 어떻게 삭제문서를 적용할것인가.  
-			
-			//방안: 세그먼트를 전달시 삭제문서도 같이 전달... 그렇다면 updateCollection을 수행하기 전에 전달해야한다.
-			
 			//고려할점 : 문서가 0인지 삭제문서가 있는지 확인후 보낸다. 
 			// 문서가 0이고 삭제문서가 있다면, segment삭제후, 삭제문서만 보내고, 
 			// 문서도 0, 삭제도 0 이라면 아무것도 보내지않고 여기서 모두 삭제하고 마무리 짓는다.
 			
 			
-			
 			//결국 세그먼트가 모두 전파된후, 인덱스 업데이트는 동시에 수행된다.
 			
 			
-
-			/* 
-			 * 2014-11-17 swsong 
-			 * 색인시는 세그먼트 파일을 만들어만 주고 외부에서 세그먼트를 기존 인덱스에 붙여준다. 
-			 */
-			collectionHandler.updateCollection(collectionContext, workingSegmentInfo, collectionIndexer.segmentDir());
-			
-			
-			
-			
-			
-			
+			/*
+			 * info.xml 에 세그먼트가 추가된다.
+			 * */
+			collectionContext.updateSegmentInfo(workingSegmentInfo);
 			
 			/*
 			 * 색인파일 원격복사.
@@ -173,10 +166,10 @@ public class CollectionAddIndexingJob extends IndexingJob {
 			indexingTaskState.setStep(IndexingTaskState.STEP_FILECOPY);
 			
 //			IndexWriteInfoList indexWriteInfoList = collectionIndexer.indexWriteInfoList();
-			SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
-			if(segmentInfo != null) {
+//			SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
+			if(workingSegmentInfo != null) {
 //				String segmentId = segmentInfo.getId();
-				logger.debug("Transfer index data collection[{}] >> {}", collectionId, segmentInfo);
+				logger.debug("Transfer index data collection[{}] >> {}", collectionId, workingSegmentInfo);
 			
 				FilePaths indexFilePaths = collectionContext.indexFilePaths();
 				File indexDir = indexFilePaths.file();
@@ -255,24 +248,36 @@ public class CollectionAddIndexingJob extends IndexingJob {
 						}
 					}
 					
-					
 					if(stopRequested){
 						throw new IndexingStopException();
 					}
 					
-					/*
-					 * 데이터노드에 컬렉션 리로드 요청.
-					 */
-					NodeCollectionUpdateJob reloadJob = new NodeCollectionUpdateJob(collectionContext);
-					nodeResultList = ClusterUtils.sendJobToNodeList(reloadJob, nodeService, nodeList, false);
-					for (int i = 0; i < nodeResultList.length; i++) {
-						NodeJobResult r = nodeResultList[i];
-						logger.debug("node#{} >> {}", i, r);
-						if (r.isSuccess()) {
-							logger.info("{} Collection reload OK.", r.node());
-						}else{
-							logger.warn("{} Collection reload Fail.", r.node());
-						}
+				}
+				
+				
+				Set<Node> reloadNodeSet = new HashSet<Node>();
+				//데이터노드
+				reloadNodeSet.addAll(nodeList);
+				//인덱스노드
+				reloadNodeSet.add(indexNode);
+				
+				// 
+				for(String nodeId : collectionContext.collectionConfig().getSearchNodeList()){
+					reloadNodeSet.add(nodeService.getNodeById(nodeId));
+				}
+				
+				/*
+				 * 데이터노드에 세그먼트 적용 요청.
+				 */
+				NodeCollectionUpdateJob reloadJob = new NodeCollectionUpdateJob(collectionContext);
+				nodeResultList = ClusterUtils.sendJobToNodeSet(reloadJob, nodeService, reloadNodeSet, true);
+				for (int i = 0; i < nodeResultList.length; i++) {
+					NodeJobResult r = nodeResultList[i];
+					logger.debug("node#{} >> {}", i, r);
+					if (r.isSuccess()) {
+						logger.info("{} Collection reload OK.", r.node());
+					}else{
+						logger.warn("{} Collection reload Fail.", r.node());
 					}
 				}
 			}
@@ -281,9 +286,9 @@ public class CollectionAddIndexingJob extends IndexingJob {
 			int duration = (int) (System.currentTimeMillis() - startTime);
 			
 			/*
-			 * 캐시 클리어.
+			 * 캐시 클리어. 저위 NodeCollectionUpdateJob 에서 수행됨.
 			 */
-			getJobExecutor().offer(new CacheServiceRestartJob());
+//			getJobExecutor().offer(new CacheServiceRestartJob());
 
 			IndexStatus indexStatus = collectionContext.indexStatus().getAddIndexStatus();
 			indexingLogger.info("[{}] Collection Add Indexing Finished! {} time = {}", collectionId, indexStatus, duration);
@@ -320,6 +325,22 @@ public class CollectionAddIndexingJob extends IndexingJob {
 			updateIndexingStatusFinish(resultStatus, streamableResult);
 		}
 
+	}
+	
+	
+	@Override
+	public void readFrom(DataInput input) throws IOException {
+		super.readFrom(input);
+		StreamableCollectionContext streamableCollectionContext = new StreamableCollectionContext(environment);
+		streamableCollectionContext.readFrom(input);
+		this.collectionContext = streamableCollectionContext.collectionContext();
+	}
+
+	@Override
+	public void writeTo(DataOutput output) throws IOException {
+		super.writeTo(output);
+		StreamableCollectionContext streamableCollectionContext = new StreamableCollectionContext(collectionContext);
+		streamableCollectionContext.writeTo(output);
 	}
 
 }

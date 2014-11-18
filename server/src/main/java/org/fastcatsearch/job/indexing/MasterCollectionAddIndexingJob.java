@@ -9,6 +9,7 @@ import org.fastcatsearch.exception.FastcatSearchException;
 import org.fastcatsearch.ir.IRService;
 import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionContext;
+import org.fastcatsearch.ir.settings.Schema;
 import org.fastcatsearch.job.MasterNodeJob;
 import org.fastcatsearch.notification.NotificationService;
 import org.fastcatsearch.notification.message.IndexingFailNotification;
@@ -36,8 +37,13 @@ public class MasterCollectionAddIndexingJob extends MasterNodeJob {
 		NodeService nodeService = ServiceManager.getInstance().getService(NodeService.class);
 		Node indexNode = nodeService.getNodeById(indexNodeId);
 
-		CollectionAddIndexingJob collectionIndexingJob = new CollectionAddIndexingJob();
+		// 증분색인용 context를 준비한다.
+		CollectionContext newCollectionContext = collectionContext.copy();
+		
+		CollectionAddIndexingJob collectionIndexingJob = new CollectionAddIndexingJob(newCollectionContext);
 		collectionIndexingJob.setArgs(collectionId);
+		collectionIndexingJob.setScheduled(isScheduled);
+		
 		logger.info("Request add indexing job to index node[{}] >> {}", indexNodeId, indexNode);
 		ResultFuture jobResult = nodeService.sendRequest(indexNode, collectionIndexingJob);
 		if (jobResult != null) {

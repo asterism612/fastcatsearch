@@ -18,9 +18,13 @@ public abstract class AbstractModule {
 		this.settings = settings;
 	}
 
-	public boolean load() throws ModuleException {
+	public synchronized boolean load() throws ModuleException {
+		if(isLoaded) {
+			logger.info("Module is already loaded. {}", toString());
+			return false;
+		}
 		if (doLoad()) {
-			logger.info("Load module {}", getClass().getSimpleName());
+			logger.info("Load module {}", toString());
 			isLoaded = true;
 			return true;
 
@@ -30,14 +34,14 @@ public abstract class AbstractModule {
 
 	}
 
-	public boolean unload() throws ModuleException {
+	public synchronized boolean unload() throws ModuleException {
 		if (!isLoaded) {
-			logger.info("Module is not loaded. {}", getClass().getSimpleName());
+			logger.info("Module is not loaded. {}", toString());
 			return false;
 		}
 		if (doUnload()) {
-			logger.info("Unload module {}", getClass().getSimpleName());
-			isLoaded = true;
+			logger.info("Unload module {}", toString());
+			isLoaded = false;
 			return true;
 
 		} else {

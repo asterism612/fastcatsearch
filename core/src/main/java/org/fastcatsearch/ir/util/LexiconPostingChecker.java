@@ -34,36 +34,33 @@ public class LexiconPostingChecker {
 	
 	private String id;
 	private File dir;
-	private int rev;
 	BufferedFileInput indexInput;
 	private int findDocNo;
 	
 	public static void main(String[] args) throws IOException {
 		String id = args[0];
 		File dir = new File(args[1]);
-		int rev = Integer.parseInt(args[2]);
 		
 		int docNo = -1;
 		
-		if(args.length > 3) {
-			docNo = Integer.parseInt(args[3]);
+		if(args.length > 2) {
+			docNo = Integer.parseInt(args[2]);
 		}
 		
-		LexiconPostingChecker checker = new LexiconPostingChecker(id, dir, rev, docNo);
+		LexiconPostingChecker checker = new LexiconPostingChecker(id, dir, docNo);
 		checker.list(System.out);
 		checker.close();
 	}
 	
 	
-	public LexiconPostingChecker(String id, File dir, int revision, int findDocNo) throws IOException{
+	public LexiconPostingChecker(String id, File dir, int findDocNo) throws IOException{
 		this.id = id;
 		this.dir = dir;
-		this.rev = revision;
 		this.findDocNo = findDocNo;
 		
 		System.out.println("Check dir = "+dir.getAbsolutePath());
 
-		indexInput = new BufferedFileInput(IndexFileNames.getRevisionDir(dir, revision), IndexFileNames.getSearchLexiconFileName(id));
+		indexInput = new BufferedFileInput(dir, IndexFileNames.getSearchLexiconFileName(id));
 	}
 	
 	public void close() throws IOException{
@@ -81,7 +78,7 @@ public class LexiconPostingChecker {
 			long inputOffset = indexInput.readLong();
 			
 			//output.println("word="+string+" ,"+ inputOffset);
-			BufferedFileInput postingInput = new BufferedFileInput(IndexFileNames.getRevisionDir(dir, rev) , IndexFileNames.getSearchPostingFileName(id));
+			BufferedFileInput postingInput = new BufferedFileInput(dir , IndexFileNames.getSearchPostingFileName(id));
 			
 			BufferedFileInput clone = postingInput.clone();
 			

@@ -64,9 +64,9 @@ public class GetIndexingDataInfoJob extends Job implements Streamable {
 		String createTime = "";
 		SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
 		if(segmentInfo != null){
-			result.createTime = createTime;
+			createTime = segmentInfo.getCreateTime();
 		}
-		result.createTime = segmentInfo.getCreateTime();
+		result.createTime = createTime;
 		
 		
 		return new JobResult(result);

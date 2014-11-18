@@ -61,14 +61,15 @@ public class NodeCollectionUpdateJob extends Job implements Streamable {
 //				}
 //			}
 			
-			CollectionContextUtil.saveCollectionAfterIndexing(collectionContext);
-			
 			IRService irService = ServiceManager.getInstance().getService(IRService.class);
 			CollectionHandler collectionHandler = irService.collectionHandler(collectionId);
 			
 			logger.debug("segment가 추가되어, 추가 및 적용합니다.{}", segmentInfo);
 //			collectionHandler.addSegmentApplyCollection(segmentInfo, segmentDir);
 			collectionHandler.updateCollection(collectionContext, segmentInfo, segmentDir);
+			
+			
+			CollectionContextUtil.saveCollectionAfterIndexing(collectionContext);
 			
 //			if(revisionAppended){
 //				logger.debug("revision이 추가되어, 세그먼트를 업데이트합니다.{}", segmentInfo);

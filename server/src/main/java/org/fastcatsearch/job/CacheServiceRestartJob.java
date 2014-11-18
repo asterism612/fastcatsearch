@@ -14,7 +14,6 @@ package org.fastcatsearch.job;
 
 import org.fastcatsearch.ir.IRService;
 import org.fastcatsearch.service.ServiceManager;
-import org.fastcatsearch.exception.FastcatSearchException;
 
 public class CacheServiceRestartJob extends Job{
 	private int delay;

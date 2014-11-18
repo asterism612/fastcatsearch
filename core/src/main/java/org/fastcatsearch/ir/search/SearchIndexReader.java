@@ -75,8 +75,8 @@ public class SearchIndexReader implements Cloneable {
 		
 		logger.debug("Search Index [{}] Dir = {}", indexId, dir.getAbsolutePath());
 		try {
-			postingInput = new BufferedFileInput(IndexFileNames.getRevisionDir(dir, revision) , IndexFileNames.getSearchPostingFileName(id));
-			lexiconInput = new BufferedFileInput(IndexFileNames.getRevisionDir(dir, revision) , IndexFileNames.getSearchLexiconFileName(id));
+			postingInput = new BufferedFileInput(dir , IndexFileNames.getSearchPostingFileName(id));
+			lexiconInput = new BufferedFileInput(dir , IndexFileNames.getSearchLexiconFileName(id));
 			
 			fileLimit = lexiconInput.length();
 			
@@ -95,7 +95,7 @@ public class SearchIndexReader implements Cloneable {
 		
 		IndexInput indexInput = null;
 		try {
-			indexInput = new BufferedFileInput(IndexFileNames.getRevisionDir(dir, revision), IndexFileNames.getSearchIndexFileName(id));
+			indexInput = new BufferedFileInput(dir, IndexFileNames.getSearchIndexFileName(id));
 			int indexSize = indexInput.readInt();
 
 			logger.debug("====memoryLexicon - {}==== index key size = {}", id, indexSize);

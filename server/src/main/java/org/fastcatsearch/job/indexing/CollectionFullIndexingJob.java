@@ -38,9 +38,6 @@ import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.io.DataInput;
 import org.fastcatsearch.ir.io.DataOutput;
-import org.fastcatsearch.ir.search.CollectionHandler;
-import org.fastcatsearch.ir.util.Counter;
-import org.fastcatsearch.job.CacheServiceRestartJob;
 import org.fastcatsearch.job.cluster.NodeCollectionReloadJob;
 import org.fastcatsearch.job.cluster.NodeDirectoryCleanJob;
 import org.fastcatsearch.job.result.IndexingJobResult;
@@ -48,7 +45,6 @@ import org.fastcatsearch.job.state.IndexingTaskState;
 import org.fastcatsearch.service.ServiceManager;
 import org.fastcatsearch.transport.vo.StreamableCollectionContext;
 import org.fastcatsearch.transport.vo.StreamableThrowable;
-import org.fastcatsearch.util.CollectionContextUtil;
 import org.fastcatsearch.util.FilePaths;
 
 /**
@@ -73,7 +69,6 @@ public class CollectionFullIndexingJob extends IndexingJob {
 	public JobResult doRun() throws FastcatSearchException {
 		
 		prepare(IndexingType.FULL, "ALL");
-		
 		
 		Throwable throwable = null;
 		ResultStatus resultStatus = ResultStatus.RUNNING;

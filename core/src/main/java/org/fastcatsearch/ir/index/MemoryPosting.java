@@ -308,12 +308,21 @@ public class MemoryPosting {
 			// new term
 			idx = getNextIdx();
 
-			if (keyUseLength + term.length() >= keyArrayLength) {
-				keyArrayLength *= 1.2;
+			int needSize = keyUseLength + term.length();
+			if(needSize > keyArrayLength) {
+				while(needSize > keyArrayLength) {
+					keyArrayLength *= 1.2;
+				}
 				char[] newArray = new char[keyArrayLength];
 				System.arraycopy(keyArray, 0, newArray, 0, keyUseLength);
 				keyArray = newArray;
 			}
+//			if (keyUseLength + term.length() >= keyArrayLength) {
+//				keyArrayLength *= 1.2;
+//				char[] newArray = new char[keyArrayLength];
+//				System.arraycopy(keyArray, 0, newArray, 0, keyUseLength);
+//				keyArray = newArray;
+//			}
 			keyPos[idx] = keyUseLength;
 
 			if (isIgnoreCase) {

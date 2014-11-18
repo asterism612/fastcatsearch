@@ -175,11 +175,11 @@ public class IRService extends AbstractService {
 			ClusterAlertService.getInstance().alert(e);
 		}
 
-		searchCache = new QueryCacheModule<String, Result>(environment, settings);
-		shardSearchCache = new QueryCacheModule<String, InternalSearchResult>(environment, settings);
-		groupingCache = new QueryCacheModule<String, GroupResults>(environment, settings);
-		groupingDataCache = new QueryCacheModule<String, GroupsData>(environment, settings);
-		documentCache = new QueryCacheModule<String, Result>(environment, settings);
+		searchCache = new QueryCacheModule<String, Result>("SearchCache", environment, settings);
+		shardSearchCache = new QueryCacheModule<String, InternalSearchResult>("ShardSearchCache", environment, settings);
+		groupingCache = new QueryCacheModule<String, GroupResults>("GroupingCache", environment, settings);
+		groupingDataCache = new QueryCacheModule<String, GroupsData>("GroupingDataCache", environment, settings);
+		documentCache = new QueryCacheModule<String, Result>("DocumentCache", environment, settings);
 		try {
 			searchCache.load();
 			shardSearchCache.load();
