@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.util.BytesRef;
@@ -25,6 +26,7 @@ import org.fastcatsearch.ir.document.PrimaryKeyIndexReader;
 import org.fastcatsearch.ir.document.merge.PrimaryKeyIndexMerger;
 import org.fastcatsearch.ir.index.DeleteIdSet;
 import org.fastcatsearch.ir.index.PrimaryKeys;
+import org.fastcatsearch.ir.index.SegmentMerger;
 import org.fastcatsearch.ir.io.BitSet;
 import org.fastcatsearch.ir.io.BytesBuffer;
 import org.fastcatsearch.ir.settings.AnalyzerSetting;
@@ -650,6 +652,66 @@ public class CollectionHandler {
 
 	public Counter queryCounter() {
 		return queryCounter;
+	}
+
+	AtomicBoolean mergeRequest = new AtomicBoolean();
+	//머징이 가능한지 확인한다.
+	public void triggerMerge() {
+		if(!mergeRequest.get()) {
+			mergeRequest.set(true);
+		}
+	}
+	
+	/*
+	 * 머지요청 확인하여 시작시키는 Thread. 
+	 * 머징은 한 컬렉션당 하나씩 single-thread로 동작한다.
+	 */
+	class MergeWorker extends Thread {
+		
+		int maxSegmentSize = 8;
+		@Override
+		public void run() {
+			if(mergeRequest.get()) {
+				
+				//적합한 머징 값을 찾는다.
+				//비슷한 갯수의 세그먼트를 찾아서 묶어준다.
+				// maxSegmentSize 보다 클 경우, maxSegmentSize 에 맞춰준다.
+				for(SegmentReader segmentReader : segmentReaderList) {
+					
+				}
+				
+				
+				List<SegmentInfo> segmentInfoList = null;
+				
+				
+				SegmentMerger merger = new SegmentMerger();
+				SegmentInfo newSegmentInfo = merger.merge(segmentInfoList);
+				SegmentReader newSegmentReader = null;
+				
+				//old segment 제거.
+				for(SegmentReader segmentReader : segmentReaderList) {
+					//removeSegmentReader(segmentReader);
+				}
+				
+				//신규 segment 추가.
+				addSegmentReader(newSegmentReader);
+				
+				File segmentDir = null;
+				try {
+					//삭제처리 불필요.
+					updateCollection(collectionContext, newSegmentInfo, segmentDir);
+				} catch (IOException e) {
+					e.printStackTrace();
+				} catch (IRException e) {
+					e.printStackTrace();
+				}
+			}
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				//ignore
+			}
+		}
 	}
 
 }

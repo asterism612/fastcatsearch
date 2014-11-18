@@ -90,6 +90,27 @@ public class NodeCollectionUpdateJob extends Job implements Streamable {
 			 * 캐시 클리어.
 			 */
 			getJobExecutor().offer(new CacheServiceRestartJob());
+			
+			
+			
+			/*
+			 * 컬렉션 세그먼트 머징 triggering.
+			 * 머징 트리거 Q에 넣는다.
+			 * Worker가 Q에서 빼서, 백그라운드로 머징을 수행한다.  
+			 * */
+			collectionHandler.triggerMerge();
+			
+			
+			
+			//
+			//TODO 
+			//
+			//
+			//
+			
+			
+			
+			
 			return new JobResult(true);
 
 		} catch (Exception e) {
