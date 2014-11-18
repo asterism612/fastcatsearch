@@ -59,7 +59,7 @@ public class CollectionAddIndexerApp {
 //				System.out.println(shardContext.shardConfig().getFilter());
 //			}
 			
-			CollectionAddIndexer indexer = new CollectionAddIndexer(collectionHandler);
+			CollectionAddIndexer indexer = null;//new CollectionAddIndexer(collectionHandler);
 
 			try {
 				indexer.doIndexing();

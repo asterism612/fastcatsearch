@@ -5,24 +5,19 @@ import java.io.IOException;
 import java.util.Date;
 
 import org.fastcatsearch.datasource.reader.AbstractDataSourceReader;
-import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.common.SettingException;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.document.Document;
 import org.fastcatsearch.ir.document.DocumentWriter;
 import org.fastcatsearch.ir.index.DeleteIdSet;
-import org.fastcatsearch.ir.index.IndexWriteInfoList;
-import org.fastcatsearch.ir.index.SegmentWriter;
 import org.fastcatsearch.ir.settings.Schema;
 import org.fastcatsearch.ir.settings.SchemaSetting;
 import org.fastcatsearch.ir.util.Formatter;
 import org.fastcatsearch.job.state.IndexingTaskState;
-import org.fastcatsearch.util.CollectionContextUtil;
 import org.fastcatsearch.util.FilePaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +45,7 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 	
 	protected abstract AbstractDataSourceReader createDataSourceReader(File filePath, SchemaSetting schemaSetting) throws IRException;
 	protected abstract void prepare() throws IRException;
-	protected abstract boolean done(RevisionInfo revisionInfo, IndexStatus indexStatus) throws IRException;
+	protected abstract boolean done(SegmentInfo segmentInfo, IndexStatus indexStatus) throws IRException;
 	
 	public void init(Schema schema) throws IRException {
 		
@@ -63,7 +58,7 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 		
 		logger.debug("WorkingSegmentInfo = {}", workingSegmentInfo);
 		String segmentId = workingSegmentInfo.getId();
-		RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
+//		RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
 
 		File segmentDir = dataFilePaths.segmentFile(dataSequence, segmentId);
 		logger.info("Segment Dir = {}", segmentDir.getAbsolutePath());
@@ -73,7 +68,7 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 		dataSourceReader = createDataSourceReader(filePath, schema.schemaSetting());
 		
 		try{
-			documentWriter = new DocumentWriter(schema.schemaSetting(), segmentDir, revisionInfo, indexConfig);
+			documentWriter = new DocumentWriter(schema.schemaSetting(), segmentDir, indexConfig);
 		}catch(Exception e){
 			throw new IRException(e);
 		}
@@ -107,7 +102,7 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 	@Override
 	public boolean close() throws IRException, SettingException{
 		
-		RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
+//		RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
 		if (documentWriter != null) {
 			try {
 				documentWriter.close();
@@ -119,21 +114,21 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 
 		dataSourceReader.close();
 		
-		logger.debug("##Indexer close {}", revisionInfo);
+		logger.debug("##Indexer close {}", workingSegmentInfo);
 		deleteIdSet = dataSourceReader.getDeleteList();
 		int deleteCount = deleteIdSet.size();
-		revisionInfo.setDocumentCount(count);
-		revisionInfo.setInsertCount(count);
-		revisionInfo.setDeleteCount(deleteCount);
-		revisionInfo.setCreateTime(Formatter.formatDate());
+		workingSegmentInfo.setDocumentCount(count);
+		workingSegmentInfo.setInsertCount(count);
+		workingSegmentInfo.setDeleteCount(deleteCount);
+		workingSegmentInfo.setCreateTime(Formatter.formatDate());
 		
 		long endTime = System.currentTimeMillis();
 		
-		IndexStatus indexStatus = new IndexStatus(revisionInfo.getDocumentCount(), revisionInfo.getInsertCount(), revisionInfo.getUpdateCount(), deleteCount,
+		IndexStatus indexStatus = new IndexStatus(workingSegmentInfo.getDocumentCount(), workingSegmentInfo.getInsertCount(), workingSegmentInfo.getUpdateCount(), deleteCount,
 				Formatter.formatDate(new Date(startTime)), Formatter.formatDate(new Date(endTime)), Formatter.getFormatTime(endTime - startTime));
 		
 		logger.debug("CLOSE >> indexStatus > {}", indexStatus);
-		done(revisionInfo, indexStatus);
+		done(workingSegmentInfo, indexStatus);
 		return true;
 	}
 	

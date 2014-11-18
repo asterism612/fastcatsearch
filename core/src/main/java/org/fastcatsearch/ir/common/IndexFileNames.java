@@ -29,6 +29,10 @@ public class IndexFileNames {
 	
 	public static final String mirrorSync = "mirror.sync";
 	
+	//삭제문서리스트. datasourcereader에서 내부 문서끼리 충돌된 아이디 리스트가 추가된다.
+	public static final String docDeleteList = "delete.list";  
+	
+	
 	public static String getTempFileName(String name){
 		return name + "." + tempFile;
 	}

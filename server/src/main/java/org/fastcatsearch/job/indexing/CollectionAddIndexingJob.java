@@ -26,23 +26,22 @@ import org.fastcatsearch.db.mapper.IndexingResultMapper.ResultStatus;
 import org.fastcatsearch.exception.FastcatSearchException;
 import org.fastcatsearch.ir.CollectionAddIndexer;
 import org.fastcatsearch.ir.IRService;
-import org.fastcatsearch.ir.MirrorSynchronizer;
+import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.index.IndexWriteInfoList;
 import org.fastcatsearch.ir.search.CollectionHandler;
+import org.fastcatsearch.ir.search.SegmentReader;
 import org.fastcatsearch.job.CacheServiceRestartJob;
-import org.fastcatsearch.job.Job.JobResult;
+import org.fastcatsearch.job.cluster.NodeCollectionUpdateJob;
 import org.fastcatsearch.job.cluster.NodeDirectoryCleanJob;
-import org.fastcatsearch.job.cluster.NodeSegmentUpdateJob;
 import org.fastcatsearch.job.result.IndexingJobResult;
 import org.fastcatsearch.job.state.IndexingTaskState;
 import org.fastcatsearch.service.ServiceManager;
-import org.fastcatsearch.task.IndexFileTransfer;
 import org.fastcatsearch.transport.vo.StreamableThrowable;
+import org.fastcatsearch.util.FilePaths;
 
 /**
  * 특정 collection의 index node에서 수행되는 job.
@@ -71,6 +70,9 @@ public class CollectionAddIndexingJob extends IndexingJob {
 			if(collectionContext == null) {
 				throw new FastcatSearchException("Collection [" + collectionId + "] is not exist.");
 			}
+			
+			AnalyzerPoolManager analyzerPoolManager = collectionHandler.analyzerPoolManager();			
+			
 			String indexNodeId = collectionContext.collectionConfig().getIndexNode();
 			NodeService nodeService = ServiceManager.getInstance().getService(NodeService.class);
 			Node indexNode = nodeService.getNodeById(indexNodeId);
@@ -99,10 +101,11 @@ public class CollectionAddIndexingJob extends IndexingJob {
 				//색인이 안된상태이다.
 				throw new FastcatSearchException("Cannot index collection. It has no full indexing information. collectionId = "+collectionContext.collectionId());
 			}
-			String lastRevisionUUID = lastSegmentInfo.getRevisionInfo().getUuid();
+			String lastRevisionUUID = lastSegmentInfo.getUuid();
 			
 			boolean isIndexed = false;
-			CollectionAddIndexer collectionIndexer = new CollectionAddIndexer(collectionHandler);
+			SegmentInfo workingSegmentInfo = lastSegmentInfo.getNextSegmentInfo();
+			CollectionAddIndexer collectionIndexer = new CollectionAddIndexer(workingSegmentInfo, collectionContext, analyzerPoolManager);
 			indexer = collectionIndexer;
 			collectionIndexer.setTaskState(indexingTaskState);
 			Throwable indexingThrowable = null;
@@ -130,39 +133,85 @@ public class CollectionAddIndexingJob extends IndexingJob {
 				throw new IndexingStopException();
 			}
 			
+			
+			
+			
+			
+			
+			
+			
+			//TODO 삭제요청 아이디를 이미 적용해버렸으므로, 다른 세그먼트에 전달해줄 것이 없다.
+			// 현 세그먼트는 적용되었다고 해도, 타 노드의 이전 세그먼트는 어떻게 삭제문서를 적용할것인가.  
+			
+			//방안: 세그먼트를 전달시 삭제문서도 같이 전달... 그렇다면 updateCollection을 수행하기 전에 전달해야한다.
+			
+			//고려할점 : 문서가 0인지 삭제문서가 있는지 확인후 보낸다. 
+			// 문서가 0이고 삭제문서가 있다면, segment삭제후, 삭제문서만 보내고, 
+			// 문서도 0, 삭제도 0 이라면 아무것도 보내지않고 여기서 모두 삭제하고 마무리 짓는다.
+			
+			
+			
+			//결국 세그먼트가 모두 전파된후, 인덱스 업데이트는 동시에 수행된다.
+			
+			
+
+			/* 
+			 * 2014-11-17 swsong 
+			 * 색인시는 세그먼트 파일을 만들어만 주고 외부에서 세그먼트를 기존 인덱스에 붙여준다. 
+			 */
+			collectionHandler.updateCollection(collectionContext, workingSegmentInfo, collectionIndexer.segmentDir());
+			
+			
+			
+			
+			
+			
+			
 			/*
 			 * 색인파일 원격복사.
 			 */
 			indexingTaskState.setStep(IndexingTaskState.STEP_FILECOPY);
 			
-			IndexWriteInfoList indexWriteInfoList = collectionIndexer.indexWriteInfoList();
+//			IndexWriteInfoList indexWriteInfoList = collectionIndexer.indexWriteInfoList();
 			SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
 			if(segmentInfo != null) {
-				
-				String segmentId = segmentInfo.getId();
+//				String segmentId = segmentInfo.getId();
 				logger.debug("Transfer index data collection[{}] >> {}", collectionId, segmentInfo);
-				RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-				int revisionId = revisionInfo.getId();
-				int dataSequence = collectionContext.getIndexSequence();
-				File revisionDir = collectionContext.collectionFilePaths().dataPaths().revisionFile(dataSequence, segmentId, revisionId);
-				File segmentDir = collectionContext.collectionFilePaths().dataPaths().segmentFile(dataSequence, segmentId);
+			
+				FilePaths indexFilePaths = collectionContext.indexFilePaths();
+				File indexDir = indexFilePaths.file();
 				
-				/*
-				 * 색인파일 원격복사.
-				 */
 				List<Node> nodeList = new ArrayList<Node>(nodeService.getNodeById(collectionContext.collectionConfig().getDataNodeList()));
 				//색인노드가 data node에 추가되어있다면 제거한다.
 				nodeList.remove(nodeService.getMyNode());
 				
+				// 색인전송할디렉토리를 먼저 비우도록 요청.segmentDir
+				File relativeDataDir = environment.filePaths().relativise(indexDir);
+				NodeDirectoryCleanJob cleanJob = new NodeDirectoryCleanJob(relativeDataDir);
+
+				NodeJobResult[] nodeResultList = null;
+				nodeResultList = ClusterUtils.sendJobToNodeList(cleanJob, nodeService, nodeList, false);
+				
+				//성공한 node만 전송.
+				nodeList = new ArrayList<Node>();
+				for (int i = 0; i < nodeResultList.length; i++) {
+					NodeJobResult r = nodeResultList[i];
+					logger.debug("node#{} >> {}", i, r);
+					if (r.isSuccess()) {
+						nodeList.add(r.node());
+					}else{
+						logger.warn("Do not send index file to {}", r.node());
+					}
+				}
+				
 				if(nodeList.size() > 0) {
-					//색인노드만 있어도 OK.
+					//색인노드만 있으면 이부분을 건너뛴다.
 					
 					/*
 					 * lastRevisionUUID가 일치하는 보낼노드가 존재하는지 확인한다.
 					 * 존재한다면 mirror sync file을 만든다.
 					 * 
 					 * */
-					NodeJobResult[] nodeResultList = null;
 					GetCollectionIndexRevisionUUIDJob getRevisionUUIDJob = new GetCollectionIndexRevisionUUIDJob();
 					getRevisionUUIDJob.setArgs(collectionId);
 					nodeResultList = ClusterUtils.sendJobToNodeList(getRevisionUUIDJob, nodeService, nodeList, false);
@@ -184,43 +233,15 @@ public class CollectionAddIndexingJob extends IndexingJob {
 						}
 					}
 					
-					
-					
-					//TODO indexWriteInfoList를 파일로 저장해놓아야 실패한 노드에 차후 전송이 가능하게 된다. 또는 mirror sync파일을 매번 만들어 놓는다던지.. 
-					//revision이 여러번 바뀌면 mirror sync를 여러번전송해서 한번씩 업데이트. 
-					
-					
-					File transferDir = null;
-					/*
-					 * 동기화 파일 생성. 
-					 * 여기서는 1. segment/ 파일들에 덧붙일 정보들이 준비되어있어야한다. revision은 그대로 복사하므로 준비필요없음.
-					 */
-					//0보다 크면 revision이 증가된것이다.
-					boolean revisionAppended = revisionInfo.getId() > 0;
-					boolean revisionHasInserts = revisionInfo.getInsertCount() > 0;
-					File mirrorSyncFile = null;
-					if(revisionAppended){
-						if(revisionHasInserts){
-							mirrorSyncFile = new MirrorSynchronizer().createMirrorSyncFile(indexWriteInfoList, revisionDir);
-							logger.debug("동기화 파일 생성 >> {}", mirrorSyncFile.getAbsolutePath());
-						}
-						
-						transferDir = revisionDir;
+					// 색인된 Segment 파일전송.
+					TransferIndexFileMultiNodeJob transferJob = new TransferIndexFileMultiNodeJob(indexDir, nodeList);
+					ResultFuture resultFuture = JobService.getInstance().offer(transferJob);
+					Object obj = resultFuture.take();
+					if(resultFuture.isSuccess() && obj != null){
+						nodeResultList = (NodeJobResult[]) obj;
 					}else{
-						//세그먼트 전체전송.
-						transferDir = segmentDir;
-						logger.debug("세그먼트 생성되어 segment dir 전송필요");
+						
 					}
-					
-					
-					if(stopRequested){
-						throw new IndexingStopException();
-					}
-					
-					// 색인전송할디렉토리를 먼저 비우도록 요청.segmentDir
-					File relativeDataDir = environment.filePaths().relativise(transferDir);
-					NodeDirectoryCleanJob cleanJob = new NodeDirectoryCleanJob(relativeDataDir);
-					nodeResultList = ClusterUtils.sendJobToNodeList(cleanJob, nodeService, nodeList, false);
 					
 					//성공한 node만 전송.
 					nodeList = new ArrayList<Node>();
@@ -233,27 +254,7 @@ public class CollectionAddIndexingJob extends IndexingJob {
 							logger.warn("Do not send index file to {}", r.node());
 						}
 					}
-					// 색인된 Segment 파일전송.
-					//case 1. segment-append 파일과 revision/ 파일들을 전송한다.
-					//case 2. 만약 segment가 생성 or 수정된 경우라면 그대로 전송하면된다. 
 					
-					TransferIndexFileMultiNodeJob transferJob = new TransferIndexFileMultiNodeJob(transferDir, nodeList);
-					ResultFuture resultFuture = JobService.getInstance().offer(transferJob);
-					Object obj = resultFuture.take();
-					if(resultFuture.isSuccess() && obj != null){
-						nodeResultList = (NodeJobResult[]) obj;
-					}
-					//성공한 node만 전송.
-					nodeList = new ArrayList<Node>();
-					for (int i = 0; i < nodeResultList.length; i++) {
-						NodeJobResult r = nodeResultList[i];
-						logger.debug("node#{} >> {}", i, r);
-						if (r.isSuccess()) {
-							nodeList.add(r.node());
-						}else{
-							logger.warn("Do not reload at {}", r.node());
-						}
-					}
 					
 					if(stopRequested){
 						throw new IndexingStopException();
@@ -262,7 +263,7 @@ public class CollectionAddIndexingJob extends IndexingJob {
 					/*
 					 * 데이터노드에 컬렉션 리로드 요청.
 					 */
-					NodeSegmentUpdateJob reloadJob = new NodeSegmentUpdateJob(collectionContext);
+					NodeCollectionUpdateJob reloadJob = new NodeCollectionUpdateJob(collectionContext);
 					nodeResultList = ClusterUtils.sendJobToNodeList(reloadJob, nodeService, nodeList, false);
 					for (int i = 0; i < nodeResultList.length; i++) {
 						NodeJobResult r = nodeResultList[i];

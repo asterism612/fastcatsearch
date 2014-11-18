@@ -1,24 +1,18 @@
 package org.fastcatsearch.ir.config;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
 
 import javax.xml.bind.JAXBException;
 
 import org.fastcatsearch.common.io.BytesStreamInput;
-import org.fastcatsearch.ir.config.CollectionsConfig.Collection;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
-import org.fastcatsearch.ir.io.BytesDataInput;
 import org.fastcatsearch.ir.io.BytesDataOutput;
-import org.fastcatsearch.ir.util.Formatter;
 import org.fastcatsearch.util.JAXBConfigs;
 import org.junit.Test;
 

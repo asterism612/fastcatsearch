@@ -12,6 +12,8 @@
 package org.fastcatsearch.job.indexing;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.fastcatsearch.cluster.Node;
 import org.fastcatsearch.cluster.NodeService;
@@ -19,12 +21,14 @@ import org.fastcatsearch.common.io.Streamable;
 import org.fastcatsearch.db.mapper.IndexingResultMapper.ResultStatus;
 import org.fastcatsearch.exception.FastcatSearchException;
 import org.fastcatsearch.ir.CollectionFullIndexer;
+import org.fastcatsearch.ir.CollectionIndexerable;
 import org.fastcatsearch.ir.IRService;
 import org.fastcatsearch.ir.MultiThreadCollectionFullIndexer;
 import org.fastcatsearch.ir.analysis.AnalyzerPoolManager;
 import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.io.DataInput;
 import org.fastcatsearch.ir.io.DataOutput;
 import org.fastcatsearch.ir.search.CollectionHandler;
@@ -93,7 +97,24 @@ public class CollectionFullIndexingStepBuildJob extends IndexingJob {
 			//////////////////////////////////////////////////////////////////////////////////////////
 			
 			boolean isIndexed = false; 
-			MultiThreadCollectionFullIndexer collectionFullIndexer = new MultiThreadCollectionFullIndexer(collectionContext, analyzerPoolManager);
+			
+			SegmentInfo segmentInfo = new SegmentInfo();
+			int segmentSize = collectionContext.collectionConfig().getFullIndexingSegmentSize();
+			CollectionIndexerable collectionFullIndexer = null;
+			if(segmentSize <= 1){
+				collectionFullIndexer = new CollectionFullIndexer(segmentInfo, collectionContext, analyzerPoolManager);
+			}else{
+				List<SegmentInfo> workingSegmentInfoList = new ArrayList<SegmentInfo>(segmentSize);
+				SegmentInfo workingSegmentInfo = new SegmentInfo();
+				workingSegmentInfoList.add(workingSegmentInfo);
+				//순차적 세그먼트 info 를 할당한다.
+				for (int inx = 1; inx < segmentSize; inx++) {
+					workingSegmentInfo = workingSegmentInfo.getNextSegmentInfo();
+					workingSegmentInfoList.add(workingSegmentInfo);
+				}
+				collectionFullIndexer = new MultiThreadCollectionFullIndexer(segmentInfo, workingSegmentInfoList, collectionContext, analyzerPoolManager);	
+			}
+//			MultiThreadCollectionFullIndexer collectionFullIndexer = new MultiThreadCollectionFullIndexer(collectionContext, analyzerPoolManager);
 			indexer = collectionFullIndexer;
 			collectionFullIndexer.setTaskState(indexingTaskState);
 			Throwable indexingThrowable = null;

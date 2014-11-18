@@ -28,9 +28,9 @@ public class GetCollectionIndexRevisionUUIDJob extends Job implements Streamable
 		IRService irService = ServiceManager.getInstance().getService(IRService.class);
 		CollectionContext collectionContext = irService.collectionContext(collectionId);
 		SegmentInfo lastSegmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
-		String lastRevisionUUID = lastSegmentInfo.getRevisionInfo().getUuid();
+		String lastSegmentUUID = lastSegmentInfo.getUuid();
 		
-		return new JobResult(lastRevisionUUID);
+		return new JobResult(lastSegmentUUID);
 	}
 
 	@Override

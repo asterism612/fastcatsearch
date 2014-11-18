@@ -108,10 +108,19 @@ public class CollectionFullIndexingJob extends IndexingJob {
 			boolean isIndexed = false; 
 			int segmentSize = collectionContext.collectionConfig().getFullIndexingSegmentSize();
 			CollectionIndexerable collectionFullIndexer = null;
+			SegmentInfo segmentInfo = new SegmentInfo();
 			if(segmentSize <= 1){
-				collectionFullIndexer = new CollectionFullIndexer(collectionContext, analyzerPoolManager);
+				collectionFullIndexer = new CollectionFullIndexer(segmentInfo, collectionContext, analyzerPoolManager);
 			}else{
-				collectionFullIndexer = new MultiThreadCollectionFullIndexer(collectionContext, analyzerPoolManager);	
+				List<SegmentInfo> workingSegmentInfoList = new ArrayList<SegmentInfo>(segmentSize);
+				SegmentInfo workingSegmentInfo = new SegmentInfo();
+				workingSegmentInfoList.add(workingSegmentInfo);
+				//순차적 세그먼트 info 를 할당한다.
+				for (int inx = 1; inx < segmentSize; inx++) {
+					workingSegmentInfo = workingSegmentInfo.getNextSegmentInfo();
+					workingSegmentInfoList.add(workingSegmentInfo);
+				}
+				collectionFullIndexer = new MultiThreadCollectionFullIndexer(segmentInfo, workingSegmentInfoList, collectionContext, analyzerPoolManager);	
 			}
 			indexer = collectionFullIndexer;
 			collectionFullIndexer.setTaskState(indexingTaskState);
@@ -145,95 +154,92 @@ public class CollectionFullIndexingJob extends IndexingJob {
 			 */
 			indexingTaskState.setStep(IndexingTaskState.STEP_FILECOPY);
 			
-			SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
-			if (segmentInfo != null) {
-				String segmentId = segmentInfo.getId();
-				logger.debug("Transfer index data collection[{}] >> {}", collectionId);
+//			String segmentId = segmentInfo.getId();
+			logger.debug("Transfer index data collection[{}] >> {}", collectionId);
 
-				FilePaths indexFilePaths = collectionContext.indexFilePaths();
-				File indexDir = indexFilePaths.file();
+			FilePaths indexFilePaths = collectionContext.indexFilePaths();
+			File indexDir = indexFilePaths.file();
 //				File segmentDir = indexFilePaths.file(segmentId);
 
-				List<Node> nodeList = new ArrayList<Node>(nodeService.getNodeById(collectionContext.collectionConfig().getDataNodeList()));
-				//색인노드가 data node에 추가되어있다면 제거한다.
-				nodeList.remove(nodeService.getMyNode());
-				
-				// 색인전송할디렉토리를 먼저 비우도록 요청.segmentDir
-				File relativeDataDir = environment.filePaths().relativise(indexDir);
-				NodeDirectoryCleanJob cleanJob = new NodeDirectoryCleanJob(relativeDataDir);
+			List<Node> nodeList = new ArrayList<Node>(nodeService.getNodeById(collectionContext.collectionConfig().getDataNodeList()));
+			//색인노드가 data node에 추가되어있다면 제거한다.
+			nodeList.remove(nodeService.getMyNode());
+			
+			// 색인전송할디렉토리를 먼저 비우도록 요청.segmentDir
+			File relativeDataDir = environment.filePaths().relativise(indexDir);
+			NodeDirectoryCleanJob cleanJob = new NodeDirectoryCleanJob(relativeDataDir);
 
-				NodeJobResult[] nodeResultList = null;
-				nodeResultList = ClusterUtils.sendJobToNodeList(cleanJob, nodeService, nodeList, false);
-				
-				//성공한 node만 전송.
-				nodeList = new ArrayList<Node>();
-				for (int i = 0; i < nodeResultList.length; i++) {
-					NodeJobResult r = nodeResultList[i];
-					logger.debug("node#{} >> {}", i, r);
-					if (r.isSuccess()) {
-						nodeList.add(r.node());
-					}else{
-						logger.warn("Do not send index file to {}", r.node());
-					}
-				}
-				// 색인된 Segment 파일전송.
-				TransferIndexFileMultiNodeJob transferJob = new TransferIndexFileMultiNodeJob(indexDir, nodeList);
-				ResultFuture resultFuture = JobService.getInstance().offer(transferJob);
-				Object obj = resultFuture.take();
-				if(resultFuture.isSuccess() && obj != null){
-					nodeResultList = (NodeJobResult[]) obj;
+			NodeJobResult[] nodeResultList = null;
+			nodeResultList = ClusterUtils.sendJobToNodeList(cleanJob, nodeService, nodeList, false);
+			
+			//성공한 node만 전송.
+			nodeList = new ArrayList<Node>();
+			for (int i = 0; i < nodeResultList.length; i++) {
+				NodeJobResult r = nodeResultList[i];
+				logger.debug("node#{} >> {}", i, r);
+				if (r.isSuccess()) {
+					nodeList.add(r.node());
 				}else{
-					
+					logger.warn("Do not send index file to {}", r.node());
 				}
+			}
+			// 색인된 Segment 파일전송.
+			TransferIndexFileMultiNodeJob transferJob = new TransferIndexFileMultiNodeJob(indexDir, nodeList);
+			ResultFuture resultFuture = JobService.getInstance().offer(transferJob);
+			Object obj = resultFuture.take();
+			if(resultFuture.isSuccess() && obj != null){
+				nodeResultList = (NodeJobResult[]) obj;
+			}else{
 				
-				//성공한 node만 전송.
-				nodeList = new ArrayList<Node>();
-				for (int i = 0; i < nodeResultList.length; i++) {
-					NodeJobResult r = nodeResultList[i];
-					logger.debug("node#{} >> {}", i, r);
-					if (r.isSuccess()) {
-						nodeList.add(r.node());
-					}else{
-						logger.warn("Do not send index file to {}", r.node());
-					}
+			}
+			
+			//성공한 node만 전송.
+			nodeList = new ArrayList<Node>();
+			for (int i = 0; i < nodeResultList.length; i++) {
+				NodeJobResult r = nodeResultList[i];
+				logger.debug("node#{} >> {}", i, r);
+				if (r.isSuccess()) {
+					nodeList.add(r.node());
+				}else{
+					logger.warn("Do not send index file to {}", r.node());
 				}
-				
-				
-				if(stopRequested){
-					throw new IndexingStopException();
+			}
+			
+			
+			if(stopRequested){
+				throw new IndexingStopException();
+			}
+			
+			Set<Node> reloadNodeSet = new HashSet<Node>();
+			//데이터노드
+			reloadNodeSet.addAll(nodeList);
+			//인덱스노드
+			reloadNodeSet.add(indexNode);
+			//마스터노드 (관리도구에 보여지기 위함) 추가
+			reloadNodeSet.add(nodeService.getMasterNode());
+			// 
+			for(String nodeId : collectionContext.collectionConfig().getSearchNodeList()){
+				reloadNodeSet.add(nodeService.getNodeById(nodeId));
+			}
+			
+			/*
+			 * 데이터노드에 컬렉션 리로드 요청.
+			 */
+			NodeCollectionReloadJob reloadJob = new NodeCollectionReloadJob(collectionContext);
+			nodeResultList = ClusterUtils.sendJobToNodeSet(reloadJob, nodeService, reloadNodeSet, true);
+			for (int i = 0; i < nodeResultList.length; i++) {
+				NodeJobResult r = nodeResultList[i];
+				logger.debug("node#{} >> {}", i, r);
+				if (r.isSuccess()) {
+					logger.info("{} Collection reload OK.", r.node());
+				}else{
+					logger.warn("{} Collection reload Fail.", r.node());
 				}
-				
-				Set<Node> reloadNodeSet = new HashSet<Node>();
-				//데이터노드
-				reloadNodeSet.addAll(nodeList);
-				//인덱스노드
-				reloadNodeSet.add(indexNode);
-				//마스터노드 (관리도구에 보여지기 위함) 추가
-				reloadNodeSet.add(nodeService.getMasterNode());
-				// 
-				for(String nodeId : collectionContext.collectionConfig().getSearchNodeList()){
-					reloadNodeSet.add(nodeService.getNodeById(nodeId));
-				}
-				
-				/*
-				 * 데이터노드에 컬렉션 리로드 요청.
-				 */
-				NodeCollectionReloadJob reloadJob = new NodeCollectionReloadJob(collectionContext);
-				nodeResultList = ClusterUtils.sendJobToNodeSet(reloadJob, nodeService, reloadNodeSet, true);
-				for (int i = 0; i < nodeResultList.length; i++) {
-					NodeJobResult r = nodeResultList[i];
-					logger.debug("node#{} >> {}", i, r);
-					if (r.isSuccess()) {
-						logger.info("{} Collection reload OK.", r.node());
-					}else{
-						logger.warn("{} Collection reload Fail.", r.node());
-					}
-				}
-				
+			}
+			
 //				if (!nodeResult) {
 //					throw new FastcatSearchException("Node Collection Reload Failed!");
 //				}
-			}
 			
 			indexingTaskState.setStep(IndexingTaskState.STEP_FINALIZE);
 			int duration = (int) (System.currentTimeMillis() - startTime);

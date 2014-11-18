@@ -2,7 +2,6 @@ package org.fastcatsearch.http.action.management.collections;
 
 import java.io.File;
 import java.io.Writer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -19,7 +18,6 @@ import org.fastcatsearch.ir.config.CollectionConfig;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionsConfig.Collection;
 import org.fastcatsearch.ir.config.DataInfo;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.search.CollectionHandler;
 import org.fastcatsearch.service.ServiceManager;
@@ -65,7 +63,7 @@ public class GetCollectionInfoListAction extends AuthAction {
 			String revisionUUID = null;
 			SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
 			if(lastSegmentInfo != null){
-				revisionUUID = lastSegmentInfo.getRevisionInfo().getUuid();
+				revisionUUID = lastSegmentInfo.getUuid();
 			}else{
 				revisionUUID = "";
 			}
@@ -102,10 +100,7 @@ public class GetCollectionInfoListAction extends AuthAction {
 				String createTime = "";
 				SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
 				if(segmentInfo != null){
-					RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-					if(revisionInfo != null){
-						createTime = revisionInfo.getCreateTime();
-					}
+					createTime = segmentInfo.getCreateTime();
 				}
 				responseWriter
 				.key("documentSize").value(documentSize)

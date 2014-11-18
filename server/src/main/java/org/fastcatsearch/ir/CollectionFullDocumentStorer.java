@@ -8,10 +8,9 @@ import org.fastcatsearch.datasource.reader.DataSourceReader;
 import org.fastcatsearch.datasource.reader.DefaultDataSourceReaderFactory;
 import org.fastcatsearch.ir.common.IRException;
 import org.fastcatsearch.ir.config.CollectionContext;
-import org.fastcatsearch.ir.config.DataSourceConfig;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
+import org.fastcatsearch.ir.config.DataSourceConfig;
 import org.fastcatsearch.ir.index.SelectedIndexList;
 import org.fastcatsearch.ir.settings.SchemaSetting;
 import org.fastcatsearch.job.indexing.IndexingStopException;
@@ -51,8 +50,8 @@ public class CollectionFullDocumentStorer extends AbstractCollectionIndexer {
 	}
 
 	@Override
-	protected boolean done(RevisionInfo revisionInfo, IndexStatus indexStatus) throws IRException, IndexingStopException {
-		int insertCount = revisionInfo.getInsertCount();
+	protected boolean done(IndexStatus indexStatus) throws IRException, IndexingStopException {
+		int insertCount = workingSegmentInfo.getInsertCount();
 
 		if (insertCount > 0 && !stopRequested) {
 			collectionContext.indexStatus().setFullIndexStatus(indexStatus);

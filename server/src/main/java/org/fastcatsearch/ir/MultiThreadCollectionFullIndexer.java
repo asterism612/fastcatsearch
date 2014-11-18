@@ -18,7 +18,6 @@ import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.common.SettingException;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.DataSourceConfig;
 import org.fastcatsearch.ir.config.IndexConfig;
@@ -53,9 +52,9 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 	
 	protected IndexWriteInfoList indexWriteInfoList;
 	
+	private SegmentInfo totalSegmentInfo; //하위 세그먼트들의 값을 모두 합쳐서 가지고 있게 된다.
 	protected List<SegmentInfo> workingSegmentInfoList;
 	
-//	protected SegmentInfo workingSegmentInfo;
 	protected int count;
 	protected long lapTime;
 	
@@ -67,24 +66,26 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 	private List<SegmentIndexWriteConsumer> consumerList;
 	
 	
-	public MultiThreadCollectionFullIndexer(CollectionContext collectionContext, AnalyzerPoolManager analyzerPoolManager) throws IRException {
-		this(collectionContext, analyzerPoolManager, null);
+	public MultiThreadCollectionFullIndexer(SegmentInfo segmentInfo, List<SegmentInfo> segmentInfoList, CollectionContext collectionContext, AnalyzerPoolManager analyzerPoolManager) throws IRException {
+		this(segmentInfo, segmentInfoList, collectionContext, analyzerPoolManager, null);
 	}
-	public MultiThreadCollectionFullIndexer(CollectionContext collectionContext, AnalyzerPoolManager analyzerPoolManager, SelectedIndexList selectedIndexList) throws IRException {
+	public MultiThreadCollectionFullIndexer(SegmentInfo segmentInfo, List<SegmentInfo> segmentInfoList, CollectionContext collectionContext, AnalyzerPoolManager analyzerPoolManager, SelectedIndexList selectedIndexList) throws IRException {
+		this.totalSegmentInfo = segmentInfo;
+		this.workingSegmentInfoList = segmentInfoList;
 		this.collectionContext = collectionContext;
 		this.analyzerPoolManager = analyzerPoolManager;
 		this.selectedIndexList = selectedIndexList;
 		this.segmentSize = collectionContext.collectionConfig().getFullIndexingSegmentSize();
 		init(collectionContext.schema());
 	}
-	
-	protected DataSourceReader createDataSourceReader(File filePath, SchemaSetting schemaSetting) throws IRException{
+
+	private DataSourceReader createDataSourceReader(File filePath, SchemaSetting schemaSetting) throws IRException{
 		DataSourceConfig dataSourceConfig = collectionContext.dataSourceConfig();
 		return DefaultDataSourceReaderFactory.createFullIndexingSourceReader(filePath, schemaSetting, dataSourceConfig);
 	}
 	
-	protected boolean done(RevisionInfo revisionInfo, IndexStatus indexStatus) throws IRException, IndexingStopException {
-		int insertCount = revisionInfo.getInsertCount();
+	private boolean done(IndexStatus indexStatus) throws IRException, IndexingStopException {
+		int insertCount = totalSegmentInfo.getInsertCount();
 
 		if (insertCount > 0 && !stopRequested) {
 			//이미 동일한 revinfo이므로 재셋팅필요없다.
@@ -95,7 +96,7 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 			for (int inx = 0; inx < segmentSize; inx++) {
 				workingSegmentInfo = workingSegmentInfoList.get(inx);
 				//문서수가 스레드 수보다 작은경우 발생할 수 있는 오류 제어.
-				if(workingSegmentInfo.getRevisionInfo().getDocumentCount() == 0) {
+				if(workingSegmentInfo.getDocumentCount() == 0) {
 					break;
 				}
 				workingSegmentInfo.setBaseNumber(baseNumber);
@@ -106,7 +107,7 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 				baseNumber = workingSegmentInfo.getNextBaseNumber();
 			}
 			//update status.xml file
-			collectionContext.updateCollectionStatus(IndexingType.FULL, revisionInfo, startTime, System.currentTimeMillis());
+			collectionContext.updateCollectionStatus(IndexingType.FULL, totalSegmentInfo, startTime, System.currentTimeMillis());
 			collectionContext.indexStatus().setFullIndexStatus(indexStatus);
 			
 			return true;
@@ -122,8 +123,8 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 		
 	}
 	
-	protected IndexWritable createIndexWriter(Schema schema, File segmentDir, RevisionInfo revisionInfo, IndexConfig indexConfig) throws IRException {
-		return new SegmentWriter(schema, segmentDir, revisionInfo, indexConfig, analyzerPoolManager, selectedIndexList);
+	protected IndexWritable createIndexWriter(Schema schema, File segmentDir, SegmentInfo segmentInfo, IndexConfig indexConfig) throws IRException {
+		return new SegmentWriter(schema, segmentDir, segmentInfo, indexConfig, analyzerPoolManager, selectedIndexList);
 	}
 	
 	public void init(Schema schema) throws IRException {
@@ -142,11 +143,11 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 			logger.debug("WorkingSegmentInfo-{} = {}", inx, workingSegmentInfo);
 			
 			String segmentId = workingSegmentInfo.getId();
-			RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
-
+//			RevisionInfo revisionInfo = workingSegmentInfo.getRevisionInfo();
+			
 			File segmentDir = dataFilePaths.segmentFile(dataSequence, segmentId);
 			logger.info("Segment Dir = {}", segmentDir.getAbsolutePath());
-			IndexWritable indexWriter = createIndexWriter(schema, segmentDir, revisionInfo, indexConfig);
+			IndexWritable indexWriter = createIndexWriter(schema, segmentDir, workingSegmentInfo, indexConfig);
 			consumerList.add(new SegmentIndexWriteConsumer(segmentId, indexWriter, documentQueue, latch));
 		}
 		File filePath = collectionContext.collectionFilePaths().file();
@@ -158,14 +159,14 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 	}
 
 	protected void prepare() throws IRException {
-		workingSegmentInfoList = new ArrayList<SegmentInfo>(segmentSize);
-		SegmentInfo workingSegmentInfo = new SegmentInfo();
-		workingSegmentInfoList.add(workingSegmentInfo);
-		//순차적 세그먼트 info 를 할당한다.
-		for (int inx = 1; inx < segmentSize; inx++) {
-			workingSegmentInfo = workingSegmentInfo.getNextSegmentInfo();
-			workingSegmentInfoList.add(workingSegmentInfo);
-		}
+//		workingSegmentInfoList = new ArrayList<SegmentInfo>(segmentSize);
+//		SegmentInfo workingSegmentInfo = new SegmentInfo();
+//		workingSegmentInfoList.add(workingSegmentInfo);
+//		//순차적 세그먼트 info 를 할당한다.
+//		for (int inx = 1; inx < segmentSize; inx++) {
+//			workingSegmentInfo = workingSegmentInfo.getNextSegmentInfo();
+//			workingSegmentInfoList.add(workingSegmentInfo);
+//		}
 		
 		// data 디렉토리를 변경한다.
 		int newDataSequence = collectionContext.nextDataSequence();
@@ -182,20 +183,7 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 		collectionContext.clearDataInfoAndStatus();
 		indexDataDir.mkdirs();
 	}
-//	public void addDocument(int threadInx, Document document) throws IRException, IOException{
-//		indexWriterList.get(threadInx).addDocument(document);
-//		if (count.incrementAndGet() % 10000 == 0) {
-//			logger.info(
-//					"{} documents indexed, lap = {} ms, elapsed = {}, mem = {}",
-//					count, System.currentTimeMillis() - lapTime,
-//							Formatter.getFormatTime(System.currentTimeMillis() - startTime),
-//							Formatter.getFormatSize(Runtime.getRuntime().totalMemory()));
-//			lapTime = System.currentTimeMillis();
-//		}
-//		if(indexingTaskState != null){
-//			indexingTaskState.incrementDocumentCount();
-//		}
-//	}
+
 	@Override
 	public void requestStop(){
 		logger.info("Collection [{}] Indexer Stop Requested! ", collectionContext.collectionId());
@@ -206,7 +194,7 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 	//색인취소(0건)이면 false;
 	@Override
 	public boolean close() throws IRException, SettingException, IndexingStopException {
-		RevisionInfo revisionInfo = new RevisionInfo();
+//		RevisionInfo revisionInfo = new RevisionInfo();
 		
 		for (int inx = 0; inx < segmentSize; inx++) {
 			
@@ -219,28 +207,31 @@ public class MultiThreadCollectionFullIndexer implements CollectionIndexerable {
 				throw new IRException(e);
 			}
 			
-			RevisionInfo subRevisionInfo = workingSegmentInfoList.get(inx).getRevisionInfo();
-			revisionInfo.add(subRevisionInfo);
-			logger.debug("revisionInfo#{} > {}", inx, revisionInfo);
+			SegmentInfo subSegmentInfo = workingSegmentInfoList.get(inx);
+			totalSegmentInfo.setDocumentCount(totalSegmentInfo.getDocumentCount() + subSegmentInfo.getDocumentCount());
+			totalSegmentInfo.setInsertCount(totalSegmentInfo.getInsertCount() + subSegmentInfo.getInsertCount());
+			totalSegmentInfo.setUpdateCount(totalSegmentInfo.getUpdateCount() + subSegmentInfo.getUpdateCount());
+//			revisionInfo.add(subRevisionInfo);
+//			logger.debug("revisionInfo#{} > {}", inx, revisionInfo);
 		}
 
 		dataSourceReader.close();
 		
-		logger.debug("##Indexer close {}", revisionInfo);
+//		logger.debug("##Indexer close {}", revisionInfo);
 		deleteIdSet = dataSourceReader.getDeleteList();
 		int deleteCount = 0;
 		if(deleteIdSet != null) {
 			deleteCount = deleteIdSet.size();
 		}
 		
-		revisionInfo.setDeleteCount(deleteCount);
+		totalSegmentInfo.setDeleteCount(deleteCount);
 		
 		long endTime = System.currentTimeMillis();
 		
-		IndexStatus indexStatus = new IndexStatus(revisionInfo.getDocumentCount(), revisionInfo.getInsertCount(), revisionInfo.getUpdateCount(), deleteCount,
+		IndexStatus indexStatus = new IndexStatus(totalSegmentInfo.getDocumentCount(), totalSegmentInfo.getInsertCount(), totalSegmentInfo.getUpdateCount(), deleteCount,
 				Formatter.formatDate(new Date(startTime)), Formatter.formatDate(new Date(endTime)), Formatter.getFormatTime(endTime - startTime));
 		
-		if(done(revisionInfo, indexStatus)){
+		if(done(indexStatus)){
 			CollectionContextUtil.saveCollectionAfterIndexing(collectionContext);
 		}else{
 			//저장하지 않음.

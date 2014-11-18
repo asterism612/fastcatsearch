@@ -1,7 +1,10 @@
 package org.fastcatsearch.ir.search;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -258,168 +261,72 @@ public class CollectionHandler {
 	/**
 	 * 증분색인후 호출하는 메소드이다. 1. 이전 세그먼트에 삭제 문서를 적용한다. 2. 해당 segment reader 재로딩 및 대체하기.
 	 * */
-	public void updateCollection(CollectionContext collectionContext, SegmentInfo segmentInfo, File segmentDir, DeleteIdSet deleteSet) throws IOException, IRException {
+	public void updateCollection(CollectionContext collectionContext, SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
 
 		this.collectionContext = collectionContext;
-
+		//2014-11-17 swsong :증분색인시 무조건 segment가 추가된다.
+		
+		//색인시 삭제요청 들어온 문서아이디 리스트.
+		DeleteIdSet deleteIdSet = null;
+		File deleteListFile = new File(segmentDir, IndexFileNames.docDeleteList);
+		if(deleteListFile.exists() && deleteListFile.length() > 0) {
+			BufferedReader reader = null;
+			try{
+				reader = new BufferedReader(new InputStreamReader(new FileInputStream(deleteListFile)));
+				String keyString = reader.readLine();
+				String[] keys = keyString.split("\t");
+				deleteIdSet = new DeleteIdSet(-1);
+				deleteIdSet.add(new PrimaryKeys(keys));
+			}finally{
+				if(reader != null) {
+					reader.close();
+				}
+			}
+		}
+		
+		BitSet[] deleteSetList = new BitSet[segmentReaderList.size()];
 		String segmentId = segmentInfo.getId();
-		SegmentReader oldSegmentReader = getSegmentReader(segmentId);
-		// 동일한 id의 세그먼트가 없을경우는 증분색인시 segment가 추가된경우이다.
-		if (oldSegmentReader == null) {
-			/*
-			 * 증분색인시 세그먼트 하나가 추가된 경우.
-			 */
-			// 전체색인시는 세그먼트 0번부터 생성. 증분색인시는 세그먼트내 문서갯수가 많아서 새로운 세그먼트를 만들어야 할 경우.
-			logger.debug("Add segment {}", segmentInfo);
-			// segmentReaderList.size가 0이상일때만 적용된다. 즉, 이전세그먼트가 존재할경우.
-
-			// TODO makeDeleteSetWithSegments를 통해 update, delete doc count가 생성된다.
-			// segmentInfo.revisionInfo에 적용하고, save할수 있도록 한다.
-			// BitSet[] deleteSetList는 파라미터로 넘겨서 reference방식으로 수정.
-			// return은 update,delete int[]를 받도록 한다.
-
-			BitSet[] deleteSetList = new BitSet[segmentReaderList.size()];
-			int[] updateAndDeleteCount = makeDeleteSetWithSegments(segmentInfo, segmentDir, segmentReaderList, deleteSet, deleteSetList);
-			/*
-			 * 적용
-			 */
-			for (int i = 0; i < segmentReaderList.size(); i++) {
-				segmentReaderList.get(i).setDeleteSet(deleteSetList[i]);
-			}
-			// 새로생성된 세그먼트는 로딩하여 리스트에 추가해준다.
-			addSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
-		} else {
-			/*
-			 * 리비전이 증가한경우.
-			 */
-			if (oldSegmentReader.segmentInfo().getIntId() != segmentReaderList.size() - 1) {
-				// 마지막 reader가 아니므로 업데이트불가. revision 생성은 마지막 segment에 수행되므로 segmentid가 다르다면 문제가 발생한것임.
-				throw new IRException("마지막 segment만 update가능합니다.");
-			}
-
-			logger.debug("Update segment {}", segmentInfo);
-			// 마지막 reader를 제외한 리스트를 생성하여 delete.set을 update한다.
-			List<SegmentReader> prevSegmentReaderList = segmentReaderList.subList(0, segmentReaderList.size() - 1);
-			// 1. [revision] pk & current delete.set
-			// 이전 리비전과의 pk를 먼저 머징해야 이전 리비전의 문서를 지울수가 있다.
-//			RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-//			File prevRevisionDir = new File(segmentDir, oldSegmentReader.segmentInfo().getRevisionName());
-//			File targetRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
-//			logger.debug("#rev Dir : prev={}, tar={}", prevRevisionDir.getPath(), targetRevisionDir.getPath());
-//
-//			if (revisionInfo.getInsertCount() == 0 && revisionInfo.getDeleteCount() > 0) {
-//				// 추가문서없이 삭제문서만 존재시 이전 rev에서 pk를 복사해온다.
-//				copyPrimaryKeyAndDeleteTemp(prevRevisionDir, targetRevisionDir);
-//			} else if (revisionInfo.getInsertCount() > 0) {
-//				mergePrimaryKeyWithPrevRevision(segmentId, prevRevisionDir, targetRevisionDir);
-//			}
-
-			// 2. [segment] prev delete.set.#
-			BitSet[] deleteSetList = new BitSet[prevSegmentReaderList.size()];
-			int[] updateAndDeleteCount = makeDeleteSetWithSegments(segmentInfo, segmentDir, prevSegmentReaderList, deleteSet, deleteSetList);
-
-			/*
-			 * 적용
-			 */
-			// 해당 segment reader 재로딩 및 대체하기.
-			// apply new delete.set.# to each segment
-			for (int i = 0; i < prevSegmentReaderList.size(); i++) {
-				prevSegmentReaderList.get(i).setDeleteSet(deleteSetList[i]);
-			}
-			// 새 revison을 읽는 segmentReader를 만들어서 기존것과 바꾼다.
-			updateSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager), oldSegmentReader);
-			// 기존 reader는 닫는다.
-			oldSegmentReader.close();
+		for (SegmentReader segmentReader : segmentReaderList) {
+			File prevSegmentDir = segmentReader.segmentDir();
+			// 복사해온 delete.set.#들을 기존 pk들을 확인하면서 update해준다. 파일에 write까지 수행됨.
+			// 예를들어 현재 segment가 5이면 수정파일은 delete.set.0,1,2,3,4 이다.
+			
+			updateDeleteSetWithSegments(segmentId, prevSegmentDir, deleteIdSet, deleteSetList);
 		}
-	}
-
-	// 색인되어있는 세그먼트를 단순히 추가만한다. delete.set파일은 이미 수정되어있다고 가정한다.
-	public void addSegmentApplyCollection(SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
-//		File lastRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
-		// 삭제문서는 마지막 세그먼트의 마지막 리비전에 최신 업데이트 파일이 있으므로, 그것을 로딩한다.
+		//적용
 		for (int i = 0; i < segmentReaderList.size(); i++) {
-			SegmentInfo prevSegmentInfo = segmentReaderList.get(i).segmentInfo();
-			BitSet deleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, prevSegmentInfo.getId()));
-			segmentReaderList.get(i).setDeleteSet(deleteSet);
+			segmentReaderList.get(i).setDeleteSet(deleteSetList[i]);
 		}
+		// 새로생성된 세그먼트는 로딩하여 리스트에 추가해준다.
 		addSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
 	}
-
-	// 단순 update. delete.set파일은 이미 수정되어있다고 가정한다.
-	public void updateSegmentApplyCollection(SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
-		if (segmentReaderList.size() == 0) {
-			return;
-		}
-//		File lastRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
-		String segmentId = segmentInfo.getId();
-		SegmentReader oldSegmentReader = getSegmentReader(segmentId);
-		logger.debug("updateSegmentApplyShard segId={}, reader={}, size={}", segmentId, oldSegmentReader, segmentReaderList.size());
-		List<SegmentReader> prevSegmentReaderList = segmentReaderList.subList(0, segmentReaderList.size() - 1);
-		for (int i = 0; i < prevSegmentReaderList.size(); i++) {
-			SegmentInfo prevSegmentInfo = prevSegmentReaderList.get(i).segmentInfo();
-			BitSet deleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, prevSegmentInfo.getId()));
-			prevSegmentReaderList.get(i).setDeleteSet(deleteSet);
-		}
-		// 새 revison을 읽는 segmentReader를 만들어서 기존것과 바꾼다.
-		updateSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager), oldSegmentReader);
-		// 기존 reader는 닫는다.
-		oldSegmentReader.close();
-	}
-
-	// 이전 세그먼트가 존재하면 delete.set을 업데이트하여 segment reader 에 적용시켜준다.
-	// 최근 색인작업으로 추가된 newSegmentInfo 세그먼트의 문서는 최신이므로 delete.set을 따로 적용할 필요가없다.
-	private int[] makeDeleteSetWithSegments(SegmentInfo segmentInfo, File segmentDir, List<SegmentReader> prevSegmentReaderList, DeleteIdSet deleteSet, BitSet[] deleteSetList)
-			throws IOException {
-		String segmentId = segmentInfo.getId();
-		int prevSegmentSize = prevSegmentReaderList.size();
-
-//		File targetRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
-
-		if (prevSegmentSize > 0) {
-
-			SegmentReader lastSegmentReader = prevSegmentReaderList.get(prevSegmentSize - 1);
-			File lastSegmentDir = lastSegmentReader.segmentDir();//revisionDir();
-
-			// 이전 revision에서 delete.set.#들을 복사해온다.
-			copyDeleteSet(prevSegmentReaderList, lastSegmentDir, segmentDir);
-		}
-
-		// 복사해온 delete.set.#들을 기존 pk들을 확인하면서 update해준다. 파일에 write까지 수행됨.
-		// 예를들어 현재 segment가 5이면 수정파일은 delete.set.0,1,2,3,4 이다.
-		return updateDeleteSetWithSegments(segmentId, segmentDir, deleteSet, prevSegmentReaderList, deleteSetList);
-	}
-
 	/*
 	 * Indexing작업으로 생성된 pk와 delete list 를 이전 segment들과 비교해보면서 세그먼트별 delete.set.#들을 업데이트한다. delete.set.# 파일들은 최종 revision디렉토리안에 존재한다.
 	 */
-	private int[] updateDeleteSetWithSegments(String segmentId, File targetRevisionDir, DeleteIdSet deleteIdSet, List<SegmentReader> prevSegmentReaderList,
-			BitSet[] prevDeleteSetList) throws IOException {
+	private int[] updateDeleteSetWithSegments(String segmentId, File segmentDir, DeleteIdSet deleteIdSet, BitSet[] prevDeleteSetList) throws IOException {
 		int[] updateAndDelete = new int[] { 0, 0 };
 		// 첨자 i는 세그먼터 id와 일치해야한다.
-		int prevSegmentSize = prevSegmentReaderList.size();
+		int prevSegmentSize = segmentReaderList.size();
 		PrimaryKeyIndexReader[] prevPkReaderList = new PrimaryKeyIndexReader[prevSegmentSize];
 
 		for (int i = 0; i < prevSegmentSize; i++) {
-			SegmentReader prevSegmentReader = prevSegmentReaderList.get(i);
+			SegmentReader prevSegmentReader = segmentReaderList.get(i);
+			File prevSegmentDir = prevSegmentReader.segmentDir();
 			String id = prevSegmentReader.segmentInfo().getId();
-			prevPkReaderList[i] = new PrimaryKeyIndexReader(prevSegmentReader.segmentDir(), IndexFileNames.primaryKeyMap);
-			prevDeleteSetList[i] = new BitSet(targetRevisionDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id));
+			
+			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
+			File f1 = new File(prevSegmentDir, filename);
+			File f2 = new File(prevSegmentDir, filename +".tmp");
+			FileUtils.copyFile(f1, f2);
+			
+			prevPkReaderList[i] = new PrimaryKeyIndexReader(prevSegmentDir, IndexFileNames.primaryKeyMap);
+			prevDeleteSetList[i] = new BitSet(f2);
 		}
-
-		if (prevSegmentSize > 0) {
-			File pkFile = new File(targetRevisionDir, IndexFileNames.primaryKeyMap);
-
-			// 1. applyPrimaryKeyToPrevSegments
-			// pk끼리 비교하면서 중복된 것은 deleteSet에 넣어준다.
-			int updateDocumentCount = applyPrimaryKeyToPrevSegments(pkFile, prevPkReaderList, prevDeleteSetList);
-			updateAndDelete[0] = updateDocumentCount;
-		}
-
-		// 2. applyDeleteIdSetToPrevSegments
-		// 색인시 수집된 deleteIdSet을 적용한다. 현재 세그먼트.revision과 이전 세그먼트에 모두적용.
-		// 추가된 리비전이라면, 이전 리비전의 pk가 이미 머징되어있어야한다.
-		int deleteDocumentCount = applyDeleteIdSetToAllSegments(segmentId, targetRevisionDir, deleteIdSet, prevPkReaderList, prevDeleteSetList);
-		updateAndDelete[1] = deleteDocumentCount;
+		
+		File pkFile = new File(segmentDir, IndexFileNames.primaryKeyMap);
+		File pkIndexFile = new File(segmentDir, IndexFileNames.getIndexFileName(IndexFileNames.primaryKeyMap));
+		File delFile = new File(segmentDir, IndexFileNames.docDeleteSet);
+		updateAndDelete = applyUpdateAndDeleteToPrevSegments(pkFile, pkIndexFile, delFile, deleteIdSet, prevPkReaderList, prevDeleteSetList);
 
 		for (int i = 0; i < prevSegmentSize; i++) {
 			prevPkReaderList[i].close();
@@ -427,8 +334,185 @@ public class CollectionHandler {
 			logger.debug("New delete.set saved. set={}", prevDeleteSetList[i]);
 		}
 
+		/*
+		 * delete.tmp를 delete파일로 바꾸고 로딩해준다.
+		 * */
+		for (int i = 0; i < prevSegmentSize; i++) {
+			SegmentReader prevSegmentReader = segmentReaderList.get(i);
+			File prevSegmentDir = prevSegmentReader.segmentDir();
+			String id = prevSegmentReader.segmentInfo().getId();
+			String filename = IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, id);
+			File f1 = new File(prevSegmentDir, filename);
+			File f2 = new File(prevSegmentDir, filename +".tmp");
+			FileUtils.copyFile(f2, f1);
+			FileUtils.deleteQuietly(f2);
+			prevDeleteSetList[i] = new BitSet(f1);
+		}
 		return updateAndDelete;
 	}
+	
+	/*
+	 * 이번에 색인된 pkFile을 이전 pkFile들과 비교하면서 중복된 pk는 deleteSetList에 추가해준다. deleteSet에 추가된 갯수는 업데이트문서 갯수를 의미하며, 해당갯수는 결과로 리턴한다.
+	 */
+	private int[] applyUpdateAndDeleteToPrevSegments(File pkFile, File pkIndexFile, File delFile, DeleteIdSet deleteIdSet, PrimaryKeyIndexReader[] prevPkReaderList, BitSet[] prevDeleteSetList) throws IOException {
+
+		// 이전 모든 세그먼트를 통틀어 업데이트되고 삭제된 문서수.
+		int updateDocumentSize = 0; // 이번 pk와 이전 pk가 동일할 경우
+		int deleteDocumentSize = 0;
+		
+		
+		/**
+		 * 1. 추가할 segment의 pk를 이전 segment의 pk와 비교하여 동일한것이 발견되면, 이전 segment의 문서를 지운다. 삭제마킹.
+		 * */
+		// 현 pk를 bulk로 읽어들여 id 중복을 확인한다.
+		PrimaryKeyIndexBulkReader pkBulkReader = null;
+
+		try { 
+			pkBulkReader = new PrimaryKeyIndexBulkReader(pkFile);
+			// 제약조건: pk 크기는 1k를 넘지않는다.
+			BytesBuffer buf = new BytesBuffer(1024);
+			// 새로 추가된 pk가 이전 세그먼트에 존재하면 update된 것이다.
+			while (pkBulkReader.next(buf) != -1) {
+				// backward matching
+				boolean updated = false;
+				for (int i = prevPkReaderList.length - 1; i >= 0; i--) {
+					int localDocNo = prevPkReaderList[i].get(buf);
+					// logger.debug("check "+new String(buf.array, 0, buf.limit));
+					if (localDocNo != -1) {
+						if (!prevDeleteSetList[i].isSet(localDocNo)) {
+							// add delete list
+							prevDeleteSetList[i].set(localDocNo);
+						}
+						if(!updated) {
+							//이번문서는 이전 문서를 지우고 업데이트를 수행한것임을 알려준다.
+							//한번만 수행하면 되므로, updated가 아닐경우만 셋팅해준다.
+							updated = true;
+							updateDocumentSize++;// updateSize 증가
+						}
+						// if found later pkmap, earlier pkmap already deleted the same pk.
+	//					break;
+						// 2014-11-17 swsong: 모든 이전 segment에 접근해서 지워준다. 
+					}
+				}
+	
+				buf.clear();
+			}
+		}finally {
+			pkBulkReader.close();
+		}
+		
+		/**
+		 * 삭제요청들어온 문서 id들을 처리한다.
+		 * */
+		if(deleteIdSet != null) {
+			PrimaryKeyIndexReader currentPkReader = null;
+			try{
+				BitSet deleteSet = new BitSet(delFile);
+				currentPkReader = new PrimaryKeyIndexReader(pkFile, pkIndexFile);
+				PrimaryKeysToBytesRef primaryKeysToBytesRef = new PrimaryKeysToBytesRef(schema);
+				Iterator<PrimaryKeys> iterator = deleteIdSet.iterator();
+				while (iterator.hasNext()) {
+					PrimaryKeys ids = iterator.next();
+					logger.debug("--- delete id = {}", ids);
+		
+					BytesRef bytesRef = primaryKeysToBytesRef.getBytesRef(ids);
+					
+					int localDocNo = currentPkReader.get(bytesRef);
+					if (localDocNo != -1) {
+						// add delete list
+						logger.debug("--- delete localDocNo = {} at current segment", localDocNo);
+						deleteSet.set(localDocNo);
+						deleteDocumentSize++;// deleteSize 증가.
+						// 현재 세그먼트에서 삭제된 pk는, 이전 세그먼트에서 찾아볼필요가 없다.
+						// 왜냐하면 현재세그먼트와 동일한 pk가 이전 세그먼트에 존재한다면 해당 pk는 이미 삭제리스트에 존재할것이기 때문이다.
+						// 저위의 1번에서 이미 처리됨.
+						continue;
+					}
+					// backward matching
+					for (int i = prevPkReaderList.length - 1; i >= 0; i--) {
+						localDocNo = prevPkReaderList[i].get(bytesRef);
+						if (localDocNo != -1) {
+							if (!prevDeleteSetList[i].isSet(localDocNo)) {
+								// add delete list
+								logger.debug("--- delete doc[{}] at segment[{}]", localDocNo, i);
+								prevDeleteSetList[i].set(localDocNo);
+								//2014-11-17 swsong: 다른 세그먼트의 삭제 갯수는 여기에 기록하지 않는다.
+	//							deleteDocumentSize++;// deleteSize 증가.
+							}
+							// 2014-11-17 swsong: 모든 이전 segment에 접근해서 지워준다.
+//							break;
+						}
+					}
+				}
+			}finally {
+				if(currentPkReader != null) {
+					currentPkReader.close();
+				}
+			}
+		}
+		
+		return new int[] { updateDocumentSize, deleteDocumentSize };
+	}
+	
+	// 이전 세그먼트가 존재하면 delete.set을 업데이트하여 segment reader 에 적용시켜준다.
+	// 최근 색인작업으로 추가된 newSegmentInfo 세그먼트의 문서는 최신이므로 delete.set을 따로 적용할 필요가 없다.
+//	private int[] makeDeleteSetWithSegments(SegmentInfo segmentInfo, File segmentDir, List<SegmentReader> prevSegmentReaderList, DeleteIdSet deleteSet, BitSet[] deleteSetList)
+//			throws IOException {
+//		String segmentId = segmentInfo.getId();
+//		int prevSegmentSize = prevSegmentReaderList.size();
+//
+////		File targetRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
+//
+//		if (prevSegmentSize > 0) {
+//
+//			SegmentReader lastSegmentReader = prevSegmentReaderList.get(prevSegmentSize - 1);
+//			File lastSegmentDir = lastSegmentReader.segmentDir();//revisionDir();
+//
+//			// 이전 revision에서 delete.set.#들을 복사해온다.
+//			copyDeleteSet(prevSegmentReaderList, lastSegmentDir, segmentDir);
+//		}
+//
+//		// 복사해온 delete.set.#들을 기존 pk들을 확인하면서 update해준다. 파일에 write까지 수행됨.
+//		// 예를들어 현재 segment가 5이면 수정파일은 delete.set.0,1,2,3,4 이다.
+//		return updateDeleteSetWithSegments(segmentId, segmentDir, deleteSet, prevSegmentReaderList, deleteSetList);
+//	}
+
+	
+
+	// 색인되어있는 세그먼트를 단순히 추가만한다. delete.set파일은 이미 수정되어있다고 가정한다.
+//	public void addSegmentApplyCollection(SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
+////		File lastRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
+//		// 삭제문서는 마지막 세그먼트의 마지막 리비전에 최신 업데이트 파일이 있으므로, 그것을 로딩한다.
+//		for (int i = 0; i < segmentReaderList.size(); i++) {
+//			SegmentInfo prevSegmentInfo = segmentReaderList.get(i).segmentInfo();
+//			BitSet deleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, prevSegmentInfo.getId()));
+//			segmentReaderList.get(i).setDeleteSet(deleteSet);
+//		}
+//		addSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
+//	}
+
+	// 단순 update. delete.set파일은 이미 수정되어있다고 가정한다.
+//	public void updateSegmentApplyCollection(SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
+//		if (segmentReaderList.size() == 0) {
+//			return;
+//		}
+////		File lastRevisionDir = new File(segmentDir, segmentInfo.getRevisionName());
+//		String segmentId = segmentInfo.getId();
+//		SegmentReader oldSegmentReader = getSegmentReader(segmentId);
+//		logger.debug("updateSegmentApplyShard segId={}, reader={}, size={}", segmentId, oldSegmentReader, segmentReaderList.size());
+//		List<SegmentReader> prevSegmentReaderList = segmentReaderList.subList(0, segmentReaderList.size() - 1);
+//		for (int i = 0; i < prevSegmentReaderList.size(); i++) {
+//			SegmentInfo prevSegmentInfo = prevSegmentReaderList.get(i).segmentInfo();
+//			BitSet deleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, prevSegmentInfo.getId()));
+//			prevSegmentReaderList.get(i).setDeleteSet(deleteSet);
+//		}
+//		// 새 revison을 읽는 segmentReader를 만들어서 기존것과 바꾼다.
+//		updateSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager), oldSegmentReader);
+//		// 기존 reader는 닫는다.
+//		oldSegmentReader.close();
+//	}
+
+
 
 	private void copyDeleteSet(List<SegmentReader> prevSegmentReaderList, File sourceDir, File targetDir) throws IOException {
 		for (SegmentReader prevSegmentReader : prevSegmentReaderList) {
@@ -484,48 +568,12 @@ public class CollectionHandler {
 		}
 	}
 
-	/*
-	 * 이번에 색인된 pkFile을 이전 pkFile들과 비교하면서 중복된 pk는 deleteSetList에 추가해준다. deleteSet에 추가된 갯수는 업데이트문서 갯수를 의미하며, 해당갯수는 결과로 리턴한다.
-	 */
-	private int applyPrimaryKeyToPrevSegments(File pkFile, PrimaryKeyIndexReader[] prevPkReaderList, BitSet[] prevDeleteSetList) throws IOException {
-
-		// 이전 모든 세그먼트를 통틀어 업데이트되고 삭제된 문서수.
-		int updateDocumentSize = 0; // 이번 pk와 이전 pk가 동일할 경우
-
-		// 현 pk를 bulk로 읽어들여 id 중복을 확인한다.
-		PrimaryKeyIndexBulkReader pkBulkReader = new PrimaryKeyIndexBulkReader(pkFile);
-
-		// 제약조건: pk 크기는 1k를 넘지않는다.
-		BytesBuffer buf = new BytesBuffer(1024);
-		// 새로 추가된 pk가 이전 세그먼트에 존재하면 update된 것이다.
-		while (pkBulkReader.next(buf) != -1) {
-			// backward matching
-			for (int i = prevPkReaderList.length - 1; i >= 0; i--) {
-				int localDocNo = prevPkReaderList[i].get(buf);
-				// logger.debug("check "+new String(buf.array, 0, buf.limit));
-				if (localDocNo != -1) {
-					if (!prevDeleteSetList[i].isSet(localDocNo)) {
-						// add delete list
-						prevDeleteSetList[i].set(localDocNo);
-						updateDocumentSize++;// updateSize 증가
-					}
-					// if found later pkmap, earlier pkmap already deleted the same pk.
-					break;
-				}
-			}
-
-			buf.clear();
-		}
-
-		pkBulkReader.close();
-
-		return updateDocumentSize;
-	}
+	
 
 	/*
 	 * 색인시 수집된 삭제문서리스트 deleteIdSet를 각 deleteSet에 적용한다. pk파일에 들어있다면 문서가 존재하는 것이므로 deleteSet에 업데이트해준다.
 	 */
-	private int applyDeleteIdSetToAllSegments(String segmentId, File targetRevisionDir, DeleteIdSet deleteIdSet, PrimaryKeyIndexReader[] prevPkReaderList,
+	private int applyDeleteIdSetToAllSegments(String segmentId, File segmentDir, DeleteIdSet deleteIdSet, PrimaryKeyIndexReader[] prevPkReaderList,
 			BitSet[] prevDeleteSetList) throws IOException {
 
 		int deleteDocumentSize = 0;
@@ -537,8 +585,8 @@ public class CollectionHandler {
 		/*
 		 * apply delete set. 이번 색인작업을 통해 삭제가 요청된 문서들을 삭제처리한다.
 		 */
-		PrimaryKeyIndexReader currentPkReader = new PrimaryKeyIndexReader(targetRevisionDir, IndexFileNames.primaryKeyMap);
-		BitSet currentDeleteSet = new BitSet(targetRevisionDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
+		PrimaryKeyIndexReader currentPkReader = new PrimaryKeyIndexReader(segmentDir, IndexFileNames.primaryKeyMap);
+		BitSet currentDeleteSet = new BitSet(segmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentId));
 		Iterator<PrimaryKeys> iterator = deleteIdSet.iterator();
 		while (iterator.hasNext()) {
 

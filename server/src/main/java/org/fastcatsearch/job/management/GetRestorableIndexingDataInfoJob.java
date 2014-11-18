@@ -61,7 +61,7 @@ public class GetRestorableIndexingDataInfoJob extends Job implements Streamable 
 				String revisionUUID = null;
 				SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
 				if(lastSegmentInfo != null){
-					revisionUUID = lastSegmentInfo.getRevisionInfo().getUuid();
+					revisionUUID = lastSegmentInfo.getUuid();
 				}else{
 					revisionUUID = "";
 				}

@@ -51,7 +51,7 @@ public class CollectionFullIndexerApp {
 			System.out.println(collectionContext.schema().getFieldSetting("id"));
 			AnalyzerPoolManager analyzerPoolManager = new AnalyzerPoolManager();
 
-			CollectionFullIndexer indexer = new CollectionFullIndexer(collectionContext, analyzerPoolManager);
+			CollectionFullIndexer indexer = new CollectionFullIndexer(null, collectionContext, analyzerPoolManager);
 
 			try {
 				indexer.doIndexing();

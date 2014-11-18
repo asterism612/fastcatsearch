@@ -12,8 +12,6 @@ import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus;
 import org.fastcatsearch.ir.config.CollectionsConfig.Collection;
 import org.fastcatsearch.ir.config.DataInfo;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
-import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.DataSourceConfig;
 import org.fastcatsearch.ir.config.IndexConfig;
 import org.fastcatsearch.ir.config.IndexingScheduleConfig;
@@ -248,15 +246,15 @@ public class CollectionContextUtil {
 				JAXBConfigs.writeConfig(new File(indexDir, SettingFileNames.dataInfo), dataInfo, DataInfo.class);
 				
 				//리비전 xml을 각 리비전 디렉토리에 백업용을 남겨둔다.
-				SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
-				if(lastSegmentInfo != null) {
-					File revisionDir = dataFilePaths.revisionFile(collectionContext.getIndexSequence(), lastSegmentInfo.getId(), lastSegmentInfo.getRevision());
-					RevisionInfo revisionInfo = lastSegmentInfo.getRevisionInfo();
-					if (revisionInfo != null) {
-						logger.debug("Save RevisionInfo >> {}, {}", revisionDir.getAbsolutePath(), revisionInfo);
-						JAXBConfigs.writeConfig(new File(revisionDir, SettingFileNames.revisionInfo), revisionInfo, RevisionInfo.class);
-					}
-				}
+//				SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
+//				if(lastSegmentInfo != null) {
+//					File revisionDir = dataFilePaths.revisionFile(collectionContext.getIndexSequence(), lastSegmentInfo.getId(), lastSegmentInfo.getRevision());
+//					RevisionInfo revisionInfo = lastSegmentInfo.getRevisionInfo();
+//					if (revisionInfo != null) {
+//						logger.debug("Save RevisionInfo >> {}, {}", revisionDir.getAbsolutePath(), revisionInfo);
+//						JAXBConfigs.writeConfig(new File(revisionDir, SettingFileNames.revisionInfo), revisionInfo, RevisionInfo.class);
+//					}
+//				}
 			}
 			
 			File workSchemaFile = collectionFilePaths.file(SettingFileNames.workSchema);

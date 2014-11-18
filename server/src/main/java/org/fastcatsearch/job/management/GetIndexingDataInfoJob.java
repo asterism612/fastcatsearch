@@ -10,7 +10,6 @@ import org.fastcatsearch.exception.FastcatSearchException;
 import org.fastcatsearch.ir.IRService;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.DataInfo;
-import org.fastcatsearch.ir.config.DataInfo.RevisionInfo;
 import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.io.DataInput;
 import org.fastcatsearch.ir.io.DataOutput;
@@ -41,7 +40,7 @@ public class GetIndexingDataInfoJob extends Job implements Streamable {
 		String revisionUUID = null;
 		SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
 		if(lastSegmentInfo != null){
-			revisionUUID = lastSegmentInfo.getRevisionInfo().getUuid();
+			revisionUUID = lastSegmentInfo.getUuid();
 		}else{
 			revisionUUID = "";
 		}
@@ -65,12 +64,9 @@ public class GetIndexingDataInfoJob extends Job implements Streamable {
 		String createTime = "";
 		SegmentInfo segmentInfo = collectionContext.dataInfo().getLastSegmentInfo();
 		if(segmentInfo != null){
-			RevisionInfo revisionInfo = segmentInfo.getRevisionInfo();
-			if(revisionInfo != null){
-				createTime = revisionInfo.getCreateTime();
-			}
+			result.createTime = createTime;
 		}
-		result.createTime = createTime;
+		result.createTime = segmentInfo.getCreateTime();
 		
 		
 		return new JobResult(result);
