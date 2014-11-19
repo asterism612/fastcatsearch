@@ -112,7 +112,8 @@ public class CollectionFullIndexingJob extends IndexingJob {
 				workingSegmentInfoList.add(workingSegmentInfo);
 				//순차적 세그먼트 info 를 할당한다.
 				for (int inx = 1; inx < segmentSize; inx++) {
-					workingSegmentInfo = workingSegmentInfo.getNextSegmentInfo();
+					workingSegmentInfo = new SegmentInfo();
+					workingSegmentInfo.setId(String.valueOf(collectionContext.getNextSegmentId()));
 					workingSegmentInfoList.add(workingSegmentInfo);
 				}
 				collectionFullIndexer = new MultiThreadCollectionFullIndexer(segmentInfo, workingSegmentInfoList, collectionContext, analyzerPoolManager);	

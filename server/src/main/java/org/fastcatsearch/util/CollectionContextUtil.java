@@ -11,6 +11,7 @@ import org.fastcatsearch.ir.config.CollectionConfig;
 import org.fastcatsearch.ir.config.CollectionContext;
 import org.fastcatsearch.ir.config.CollectionIndexStatus;
 import org.fastcatsearch.ir.config.CollectionsConfig.Collection;
+import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.DataInfo;
 import org.fastcatsearch.ir.config.DataSourceConfig;
 import org.fastcatsearch.ir.config.IndexConfig;
@@ -61,7 +62,7 @@ public class CollectionContextUtil {
 			
 			Schema schema = new Schema(schemaSetting);
 			CollectionContext collectionContext = new CollectionContext(collectionFilePaths.getId(), collectionFilePaths);
-			collectionContext.init(schema, null, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig);
+			collectionContext.init(schema, null, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig, 0);
 			return collectionContext;
 		} catch (Exception e) {
 			throw new SettingException("CollectionContext 로드중 에러발생", e);
@@ -137,10 +138,14 @@ public class CollectionContextUtil {
 			} else {
 				indexingScheduleConfig = new IndexingScheduleConfig();
 			}
-			
+			SegmentInfo lastSegmentInfo = dataInfo.getLastSegmentInfo();
+			int lastSegmentId = 0;
+			if(lastSegmentInfo != null) {
+				lastSegmentId = Integer.parseInt(lastSegmentInfo.getId());
+			}
 			Schema schema = new Schema(schemaSetting);
 			CollectionContext collectionContext = new CollectionContext(collection.getId(), collectionFilePaths);
-			collectionContext.init(schema, workSchemaSetting, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig);
+			collectionContext.init(schema, workSchemaSetting, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig, lastSegmentId);
 			
 			return collectionContext;
 		} catch (Exception e) {

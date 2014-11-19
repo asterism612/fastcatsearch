@@ -57,7 +57,7 @@ public class DocumentWriteReadTest extends TestCase{
 		
 		SchemaSetting schemaSetting = createSchemaSetting();
 		IndexConfig indexConfig = createIndexConfig();
-		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir, indexConfig);
+		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir);
 		
 		Document document = new Document(6);
 		document.add(new LongField("id", "100"));
@@ -83,7 +83,7 @@ public class DocumentWriteReadTest extends TestCase{
 		SchemaSetting schemaSetting = createSchemaSetting();
 //		schema.getFieldSettingList().get(2).setStore(false); //field-2는 저장하지 않음.
 		IndexConfig indexConfig = createIndexConfig();
-		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir, indexConfig);
+		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir);
 		
 		Document document = new Document(6);
 		document.add(new LongField("id", "100"));
@@ -137,7 +137,7 @@ public class DocumentWriteReadTest extends TestCase{
 		schemaSetting.getFieldSettingList().get(4).setMultiValue(true);
 		
 		IndexConfig indexConfig = createIndexConfig();
-		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir, indexConfig);
+		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir);
 		
 		Document document = new Document(6);
 		document.add(new LongField("id", "100"));
@@ -188,7 +188,7 @@ public class DocumentWriteReadTest extends TestCase{
 		schemaSetting.getFieldSettingList().get(4).setMultiValue(true);
 		
 		IndexConfig indexConfig = createIndexConfig();
-		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir, indexConfig);
+		DocumentWriter dw = new DocumentWriter(schemaSetting, targetDir);
 		
 		int count = 300;
 		for (int i = 0; i < count; i++) {

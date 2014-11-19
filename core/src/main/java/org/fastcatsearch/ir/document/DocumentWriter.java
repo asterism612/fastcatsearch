@@ -61,7 +61,7 @@ public class DocumentWriter implements WriteInfoLoggable {
 	private Deflater compressor;
 	private int count; //현 색인시 추가문서갯수.
 	
-	public DocumentWriter(SchemaSetting schemaSetting, File dir, IndexConfig indexConfig) throws IOException, IRException {
+	public DocumentWriter(SchemaSetting schemaSetting, File dir) throws IOException, IRException {
 		
 //		boolean isAppend = revisionInfo.isAppend();
 		

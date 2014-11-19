@@ -1,6 +1,7 @@
 package org.fastcatsearch.ir.config;
 
 import java.util.Date;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.fastcatsearch.ir.common.IndexingType;
 import org.fastcatsearch.ir.config.CollectionIndexStatus.IndexStatus;
@@ -25,14 +26,16 @@ public class CollectionContext {
 	private CollectionIndexStatus collectionIndexStatus;
 	private DataInfo dataInfo;
 	private IndexingScheduleConfig indexingScheduleConfig;
+	private AtomicInteger lastSegmentId;
 	
 	public CollectionContext(String collectionId, FilePaths collectionFilePaths) {
 		this.id = collectionId;
 		this.collectionFilePaths = collectionFilePaths;
+		this.lastSegmentId = new AtomicInteger();
 	}
 
 	public void init(Schema schema, SchemaSetting workSchemaSetting, CollectionConfig collectionConfig, IndexConfig indexConfig, DataSourceConfig dataSourceConfig
-			, CollectionIndexStatus collectionStatus, DataInfo dataInfo, IndexingScheduleConfig indexingScheduleConfig){
+			, CollectionIndexStatus collectionStatus, DataInfo dataInfo, IndexingScheduleConfig indexingScheduleConfig, int lastSegmentId){
 		this.schema = schema;
 		this.workSchemaSetting = workSchemaSetting;
 		this.collectionConfig = collectionConfig;
@@ -41,6 +44,7 @@ public class CollectionContext {
 		this.collectionIndexStatus = collectionStatus;
 		this.dataInfo = dataInfo;
 		this.indexingScheduleConfig = indexingScheduleConfig;
+		this.lastSegmentId.set(lastSegmentId);
 	}
 	
 	
@@ -54,11 +58,20 @@ public class CollectionContext {
 		collectionContext.collectionIndexStatus = collectionIndexStatus.copy();
 		collectionContext.dataInfo = dataInfo.copy();
 		collectionContext.indexingScheduleConfig = indexingScheduleConfig;
+		collectionContext.lastSegmentId = lastSegmentId;
 		return collectionContext;
 	}
 	
 	public String collectionId(){
 		return id;
+	}
+	
+	public int getLastSegmentId(){
+		return lastSegmentId.get();
+	}
+	
+	public int getNextSegmentId(){
+		return lastSegmentId.incrementAndGet();
 	}
 	
 	//collection home 디렉토리를 리턴한다.

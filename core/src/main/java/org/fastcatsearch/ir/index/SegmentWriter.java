@@ -48,7 +48,7 @@ public class SegmentWriter extends SegmentIndexWriter implements WriteInfoLoggab
 		super(schema, targetDir, segmentInfo, indexConfig, analyzerPoolManager, selectedIndexList);
 		try {
 			lastDocNo = -1;
-			documentWriter = new DocumentWriter(schema.schemaSetting(), targetDir, indexConfig);
+			documentWriter = new DocumentWriter(schema.schemaSetting(), targetDir);
 		} catch (IOException e) {
 			try {
 				closeWriter();

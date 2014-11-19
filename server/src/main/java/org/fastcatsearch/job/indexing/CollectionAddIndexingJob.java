@@ -118,7 +118,9 @@ public class CollectionAddIndexingJob extends IndexingJob {
 			String lastRevisionUUID = lastSegmentInfo.getUuid();
 			
 			boolean isIndexed = false;
-			SegmentInfo workingSegmentInfo = lastSegmentInfo.getNextSegmentInfo();
+			SegmentInfo workingSegmentInfo = new SegmentInfo();
+			workingSegmentInfo.setId(String.valueOf(collectionContext.getNextSegmentId()));
+			
 			CollectionAddIndexer collectionIndexer = new CollectionAddIndexer(workingSegmentInfo, collectionContext, analyzerPoolManager);
 			indexer = collectionIndexer;
 			collectionIndexer.setTaskState(indexingTaskState);

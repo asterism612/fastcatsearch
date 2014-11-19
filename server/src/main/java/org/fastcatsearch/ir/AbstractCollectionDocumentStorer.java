@@ -68,7 +68,7 @@ public abstract class AbstractCollectionDocumentStorer implements CollectionInde
 		dataSourceReader = createDataSourceReader(filePath, schema.schemaSetting());
 		
 		try{
-			documentWriter = new DocumentWriter(schema.schemaSetting(), segmentDir, indexConfig);
+			documentWriter = new DocumentWriter(schema.schemaSetting(), segmentDir);
 		}catch(Exception e){
 			throw new IRException(e);
 		}

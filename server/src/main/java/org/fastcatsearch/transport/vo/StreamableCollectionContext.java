@@ -51,11 +51,11 @@ public class StreamableCollectionContext implements Streamable {
 			CollectionIndexStatus collectionStatus = JAXBConfigs.readFrom(input, CollectionIndexStatus.class);
 			DataInfo dataInfo = JAXBConfigs.readFrom(input, DataInfo.class);
 			IndexingScheduleConfig indexingScheduleConfig = JAXBConfigs.readFrom(input, IndexingScheduleConfig.class);
+			int lastSegmentId = input.readInt();
 			//collectionFilePaths는 현 node에 적합하도록 새로 생성한다. 
 			FilePaths collectionFilePaths = environment.filePaths().collectionFilePaths(collectionId);
 			this.collectionContext = new CollectionContext(collectionId, collectionFilePaths);
-			collectionContext.init(schema, null, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig);
-			
+			collectionContext.init(schema, null, collectionConfig, indexConfig, dataSourceConfig, collectionStatus, dataInfo, indexingScheduleConfig, lastSegmentId);
 		} catch (JAXBException e) {
 			throw new IOException(e);
 		}
@@ -73,6 +73,7 @@ public class StreamableCollectionContext implements Streamable {
 			JAXBConfigs.writeTo(output, collectionContext.indexStatus(), CollectionIndexStatus.class);
 			JAXBConfigs.writeTo(output, collectionContext.dataInfo(), DataInfo.class);
 			JAXBConfigs.writeTo(output, collectionContext.indexingScheduleConfig(), IndexingScheduleConfig.class);
+			output.writeInt(collectionContext.getLastSegmentId());
 			
 		} catch (JAXBException e) {
 			throw new IOException(e);

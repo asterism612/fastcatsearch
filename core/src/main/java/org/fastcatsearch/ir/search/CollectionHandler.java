@@ -6,6 +6,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,7 +25,6 @@ import org.fastcatsearch.ir.config.DataInfo.SegmentInfo;
 import org.fastcatsearch.ir.config.DataPlanConfig;
 import org.fastcatsearch.ir.document.PrimaryKeyIndexBulkReader;
 import org.fastcatsearch.ir.document.PrimaryKeyIndexReader;
-import org.fastcatsearch.ir.document.merge.PrimaryKeyIndexMerger;
 import org.fastcatsearch.ir.index.DeleteIdSet;
 import org.fastcatsearch.ir.index.PrimaryKeys;
 import org.fastcatsearch.ir.index.SegmentMerger;
@@ -137,7 +138,7 @@ public class CollectionHandler {
 					File segmentDir = dataPaths.segmentFile(dataSequence, segmentInfo.getId());
 //					 삭제문서는 마지막 세그먼트의 마지막 리비전에 최신 업데이트 파일이 있으므로, 그것을 로딩한다.
 //					BitSet deleteSet = new BitSet(lastSegmentDir, IndexFileNames.getSuffixFileName(IndexFileNames.docDeleteSet, segmentInfo.getId()));
-					segmentReaderList.add(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
+					segmentReaderList.add(loadSegmentReader(segmentInfo, segmentDir));
 					logger.debug("{}", segmentInfo);
 				}
 			} catch (IOException e) {
@@ -146,6 +147,21 @@ public class CollectionHandler {
 		}
 	}
 
+	private SegmentReader loadSegmentReader(SegmentInfo segmentInfo, File segmentDir) throws IOException, IRException {
+		return new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager);
+	}
+	
+	private SegmentReader removeSegmentReader(SegmentInfo segmentInfo) {
+		for(SegmentReader segmentReader : segmentReaderList) {
+			if(segmentReader.segmentInfo().equals(segmentInfo)) {
+				segmentReaderList.remove(segmentReader);
+				return segmentReader;
+			}
+		}
+		//못찾았을 경우 null
+		return null;
+	}
+	
 	public void close() throws IOException {
 		logger.info("Close Collection handler {}", collectionId);
 		if (segmentReaderList != null) {
@@ -298,6 +314,13 @@ public class CollectionHandler {
 		//적용
 		for (int i = 0; i < segmentReaderList.size(); i++) {
 			segmentReaderList.get(i).setDeleteSet(deleteSetList[i]);
+		}
+		
+		List<SegmentInfo> segmentInfoList = collectionContext.dataInfo().getSegmentInfoList();
+		//세그먼트가 나를 제외하고 더 존재한다면, baseSize + docSize를 계산해서 나의 segment의 baseSize로 넣어준다. 
+		if(segmentInfoList.size() >= 2) {
+			SegmentInfo prevSegmentInfo = segmentInfoList.get(segmentInfoList.size() - 1);
+			segmentInfo.setBaseNumber(prevSegmentInfo.getBaseNumber() + prevSegmentInfo.getDocumentCount());
 		}
 		// 새로생성된 세그먼트는 로딩하여 리스트에 추가해준다.
 		addSegmentReader(new SegmentReader(segmentInfo, schema, segmentDir, analyzerPoolManager));
@@ -663,6 +686,17 @@ public class CollectionHandler {
 	}
 	
 	/*
+	 * 세그먼트를 문서수가 작은순으로 정렬하는 comparator 
+	 * */
+	class SegmentInfoDescSorter implements Comparator<SegmentInfo> {
+
+		@Override
+		public int compare(SegmentInfo i1, SegmentInfo i2) {
+			return i2.getDocumentCount() - i1.getDocumentCount();
+		}
+		
+	}
+	/*
 	 * 머지요청 확인하여 시작시키는 Thread. 
 	 * 머징은 한 컬렉션당 하나씩 single-thread로 동작한다.
 	 */
@@ -676,36 +710,86 @@ public class CollectionHandler {
 				//적합한 머징 값을 찾는다.
 				//비슷한 갯수의 세그먼트를 찾아서 묶어준다.
 				// maxSegmentSize 보다 클 경우, maxSegmentSize 에 맞춰준다.
+				
+				SegmentInfoDescSorter segmentInfoDescSorter = new SegmentInfoDescSorter();
+				List<SegmentInfo> sortedSegmentInfoList = new ArrayList<SegmentInfo>(segmentReaderList.size());
+				
 				for(SegmentReader segmentReader : segmentReaderList) {
+					sortedSegmentInfoList.add(segmentReader.segmentInfo());
+				}
+				
+				
+				int mergeLimitCountStart = 0;
+				int mergeLimitCountEnd = 10000;
+				
+				while(sortedSegmentInfoList.size() > 0) {
+					Collections.sort(sortedSegmentInfoList, segmentInfoDescSorter);
+					List<SegmentInfo> toBeMerged = new ArrayList<SegmentInfo>();
+					for(SegmentInfo segmentInfo : sortedSegmentInfoList) {
+						int docCount = segmentInfo.getDocumentCount();
+						if(docCount >= mergeLimitCountStart && docCount < mergeLimitCountEnd) {
+							toBeMerged.add(segmentInfo);
+							sortedSegmentInfoList.remove(segmentInfo);
+						}
+					}
 					
+					
+					//머징할 것이 없고, 남은 것이 하나도 없으면 끝낸다.
+					if(toBeMerged.size() < 2 && sortedSegmentInfoList.size() == 0) {
+						break;
+					}
+					
+					logger.debug("## Segment Merge {} ~ {} => {}", mergeLimitCountStart, mergeLimitCountEnd, toBeMerged.size());
+					
+					if(toBeMerged.size() >= 2) {
+						int dataSequence = collectionContext.indexStatus().getSequence();
+						FilePaths dataPaths = collectionFilePaths.dataPaths();
+						File indexDir = dataPaths.indexDirFile(dataSequence);	
+						SegmentMerger merger = new SegmentMerger(schema, indexDir);
+						SegmentInfo newSegmentInfo = merger.merge(toBeMerged);
+						sortedSegmentInfoList.add(newSegmentInfo);
+						
+						/*
+						 * 머징된 신규 segment를 적용하고, old segment는 제거한다. 
+						 */
+						
+						File segmentDir = dataPaths.segmentFile(dataSequence, newSegmentInfo.getId());
+						
+						try{
+							SegmentReader newSegmentReader = loadSegmentReader(newSegmentInfo, segmentDir);
+							
+							//old segment 제거.
+							for(SegmentInfo removeSegmentInfo : toBeMerged) {
+								SegmentReader oldSegmentReader = removeSegmentReader(removeSegmentInfo);
+								
+								// FIXME
+								// 사용중일 수도 있다.
+								// file close exception을 유발가능.
+								// reader에 reference-count를 넣어서 참조하고 있는지 여부를 확인해야한다.
+								
+								oldSegmentReader.close();
+							}
+							//신규 segment 추가.
+							addSegmentReader(newSegmentReader);
+							
+							//삭제처리 불필요.
+							updateCollection(collectionContext, newSegmentInfo, segmentDir);
+							
+						}catch(IOException e) {
+							logger.error("",e );
+						} catch (IRException e) {
+							logger.error("",e );
+						}
+						
+					}
+					
+					//10씩 곱해가면서 다음 머징레벨을 찾는다.
+					mergeLimitCountStart = mergeLimitCountEnd;
+					mergeLimitCountEnd *= 10;
 				}
 				
-				
-				List<SegmentInfo> segmentInfoList = null;
-				
-				
-				SegmentMerger merger = new SegmentMerger();
-				SegmentInfo newSegmentInfo = merger.merge(segmentInfoList);
-				SegmentReader newSegmentReader = null;
-				
-				//old segment 제거.
-				for(SegmentReader segmentReader : segmentReaderList) {
-					//removeSegmentReader(segmentReader);
-				}
-				
-				//신규 segment 추가.
-				addSegmentReader(newSegmentReader);
-				
-				File segmentDir = null;
-				try {
-					//삭제처리 불필요.
-					updateCollection(collectionContext, newSegmentInfo, segmentDir);
-				} catch (IOException e) {
-					e.printStackTrace();
-				} catch (IRException e) {
-					e.printStackTrace();
-				}
 			}
+			
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {

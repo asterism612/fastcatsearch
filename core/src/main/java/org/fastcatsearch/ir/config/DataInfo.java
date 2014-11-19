@@ -353,12 +353,12 @@ public class DataInfo {
 			}
 		}
 
-		public SegmentInfo getNextSegmentInfo() {
-			SegmentInfo nextSegmentInfo = new SegmentInfo();
-			nextSegmentInfo.id = getNextId();
-			nextSegmentInfo.baseNumber = getNextBaseNumber();
-			return nextSegmentInfo;
-		}
+//		public SegmentInfo getNextSegmentInfo() {
+//			SegmentInfo nextSegmentInfo = new SegmentInfo();
+//			nextSegmentInfo.id = getNextId();
+////			nextSegmentInfo.baseNumber = getNextBaseNumber();
+//			return nextSegmentInfo;
+//		}
 
 		@Override
 		public int compareTo(SegmentInfo o) {
